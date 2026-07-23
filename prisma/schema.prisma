@@ -1,0 +1,356 @@
+// FORME — data model
+// SQLite for local dev. Schema is Postgres-compatible (JSON stored as TEXT strings,
+// enums as strings) so it can migrate to Postgres/Supabase with minimal changes.
+// Designed so a future ranking / RL / preference-optimization system can attach to
+// PreferenceSignal + UserFeedback + Critique without schema churn.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Identity ──────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects    Project[]
+  references  Reference[]
+  collections Collection[]
+  feedback    UserFeedback[]
+  signals     PreferenceSignal[]
+}
+
+// ── Workspace ─────────────────────────────────────────────────────────────
+model Project {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  // Structured user requirements (JSON string): business, audience, pages, brand, etc.
+  requirements String?
+  status       String   @default("draft") // draft | researching | directed | generating | critiquing | ready
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  references       ProjectReference[]
+  dnaProfiles      DesignDNAProfile[]
+  directions       DesignDirection[]
+  designSystems    DesignSystem[]
+  generatedSites   GeneratedWebsite[]
+  feedback         UserFeedback[]
+  signals          PreferenceSignal[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ── References (URLs + screenshots users save/analyze) ──────────────────────
+model Reference {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // "url" | "screenshot"
+  title     String?
+  sourceUrl String? // for kind=url
+  filePath  String? // for kind=screenshot (relative to STORAGE_DIR)
+  fileMime  String?
+  tags      String? // JSON string array
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  websiteAnalysis    WebsiteAnalysis?
+  screenshotAnalyses ScreenshotAnalysis[]
+  dnaProfiles        DesignDNAProfile[]
+  projects           ProjectReference[]
+  collections        CollectionReference[]
+
+  @@index([userId])
+  @@index([kind])
+}
+
+// Many-to-many: References <-> Projects
+model ProjectReference {
+  projectId   String
+  referenceId String
+  role        String @default("inspiration") // inspiration | redesign-target | brand
+  createdAt   DateTime @default(now())
+
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reference Reference @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, referenceId])
+  @@index([referenceId])
+}
+
+// ── Reference organization ──────────────────────────────────────────────────
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  references CollectionReference[]
+
+  @@index([userId])
+}
+
+model CollectionReference {
+  collectionId String
+  referenceId  String
+  createdAt    DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  reference  Reference  @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, referenceId])
+  @@index([referenceId])
+}
+
+// ── Analyses ────────────────────────────────────────────────────────────────
+model WebsiteAnalysis {
+  id            String   @id @default(cuid())
+  referenceId   String   @unique
+  url           String
+  finalUrl      String?
+  title         String?
+  // captured artifacts (relative paths)
+  fullScreenshot String?
+  viewportShots  String? // JSON string array
+  // extracted structure + raw signals (JSON strings)
+  structure     String?
+  htmlSignals   String?
+  status        String   @default("pending") // pending | rendering | analyzing | done | error
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reference   Reference          @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  dnaProfile  DesignDNAProfile?
+
+  @@index([status])
+}
+
+model ScreenshotAnalysis {
+  id          String   @id @default(cuid())
+  referenceId String
+  filePath    String
+  device      String? // desktop | mobile | full | section | app
+  status      String   @default("pending")
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reference  Reference         @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  dnaProfile DesignDNAProfile?
+
+  @@index([referenceId])
+  @@index([status])
+}
+
+// ── Design DNA ──────────────────────────────────────────────────────────────
+model DesignDNAProfile {
+  id                   String   @id @default(cuid())
+  referenceId          String?
+  websiteAnalysisId    String?  @unique
+  screenshotAnalysisId String?  @unique
+  projectId            String?
+  source               String // "url" | "screenshot" | "synthesized"
+  // Full Design DNA (JSON string) — the canonical structured representation.
+  profile              String
+  summary              String? // short human-readable summary
+  modelMeta            String? // JSON: model, promptVersion, tokens, latency
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  reference          Reference?          @relation(fields: [referenceId], references: [id], onDelete: SetNull)
+  websiteAnalysis    WebsiteAnalysis?    @relation(fields: [websiteAnalysisId], references: [id], onDelete: SetNull)
+  screenshotAnalysis ScreenshotAnalysis? @relation(fields: [screenshotAnalysisId], references: [id], onDelete: SetNull)
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([referenceId])
+  @@index([projectId])
+  @@index([source])
+}
+
+// ── Direction + System ──────────────────────────────────────────────────────
+model DesignDirection {
+  id          String   @id @default(cuid())
+  projectId   String
+  version     Int      @default(1)
+  // Structured design direction (JSON string).
+  direction   String
+  summary     String?
+  approved    Boolean  @default(false)
+  modelMeta   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  designSystems DesignSystem[]
+  sites         GeneratedWebsite[]
+
+  @@index([projectId])
+}
+
+model DesignSystem {
+  id          String   @id @default(cuid())
+  projectId   String
+  directionId String?
+  // typography, color, spacing, components, motion tokens (JSON string).
+  tokens      String
+  css         String? // generated CSS variables / utility layer
+  modelMeta   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  direction DesignDirection? @relation(fields: [directionId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+// ── Generation + versioning ──────────────────────────────────────────────────
+model GeneratedWebsite {
+  id          String   @id @default(cuid())
+  projectId   String
+  directionId String?
+  kind        String   @default("new") // new | redesign
+  title       String?
+  status      String   @default("draft") // draft | rendered | critiqued | improving | final
+  currentVersionId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  direction  DesignDirection? @relation(fields: [directionId], references: [id], onDelete: SetNull)
+  versions   WebsiteVersion[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model WebsiteVersion {
+  id          String   @id @default(cuid())
+  websiteId   String
+  version     Int
+  label       String? // "v1", "improved-spacing", etc.
+  html        String   // full generated HTML document
+  // captured render (relative paths)
+  screenshot  String?
+  mobileShot  String?
+  // score snapshot for quick comparison
+  overallScore Float?
+  parentVersionId String? // lineage for regression/revert
+  changeNote  String?
+  createdAt   DateTime @default(now())
+
+  website     GeneratedWebsite     @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  critiques   Critique[]
+  iterations  ImprovementIteration[]
+
+  @@unique([websiteId, version])
+  @@index([websiteId])
+}
+
+// ── Critique + improvement ────────────────────────────────────────────────────
+model Critique {
+  id          String   @id @default(cuid())
+  versionId   String
+  overallScore Float
+  // multi-dimensional scores + issues + strengths + improvements (JSON string)
+  report      String
+  modelMeta   String?
+  createdAt   DateTime @default(now())
+
+  version WebsiteVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId])
+}
+
+model ImprovementIteration {
+  id             String   @id @default(cuid())
+  fromVersionId  String
+  toVersionId    String?
+  iteration      Int
+  targetedIssues String? // JSON string array of issue categories addressed
+  scoreBefore    Float?
+  scoreAfter     Float?
+  accepted       Boolean  @default(false) // kept only if it improved (no regression)
+  regression     Boolean  @default(false)
+  note           String?
+  modelMeta      String?
+  createdAt      DateTime @default(now())
+
+  fromVersion WebsiteVersion @relation(fields: [fromVersionId], references: [id], onDelete: Cascade)
+
+  @@index([fromVersionId])
+}
+
+// ── Learning signals ──────────────────────────────────────────────────────────
+model UserFeedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  projectId String?
+  targetType String // website | version | direction | dna | section
+  targetId  String
+  action    String // accept | reject | prefer | edit | regenerate | rate | comment
+  value     String? // JSON string: chosen id, rating, edited fields, free text
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([action])
+}
+
+// Anonymized, aggregation-ready preference signals for the Design Intelligence Dataset.
+model PreferenceSignal {
+  id          String   @id @default(cuid())
+  userId      String?
+  projectId   String?
+  category    String? // saas | ai | portfolio | ...
+  signalType  String // preferred_over | improved_quality | accepted_change | rejected_change
+  // Compact feature vector / descriptors of the winning and losing options (JSON string).
+  features    String
+  weight      Float    @default(1.0)
+  createdAt   DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([signalType])
+  @@index([category])
+}
+
+// ── AI observability (every model call is logged) ──────────────────────────────
+model AiCall {
+  id            String   @id @default(cuid())
+  operation     String // reference-analysis | design-direction | visual-critique | ...
+  promptVersion String
+  provider      String // gemini | mock
+  model         String
+  inputType     String // text | vision | multimodal
+  inputTokens   Int?
+  outputTokens  Int?
+  latencyMs     Int?
+  ok            Boolean  @default(true)
+  error         String?
+  createdAt     DateTime @default(now())
+
+  @@index([operation])
+  @@index([createdAt])
+}

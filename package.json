@@ -1,0 +1,41 @@
+{
+  "name": "forme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FORME — AI-powered web design intelligence and website generation platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "playwright:install": "playwright install chromium",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@google/genai": "^0.14.0",
+    "@prisma/client": "^6.3.1",
+    "clsx": "^2.1.1",
+    "nanoid": "^5.0.9",
+    "next": "15.1.6",
+    "playwright": "^1.50.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "prisma": "^6.3.1",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

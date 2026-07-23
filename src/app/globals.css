@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #08090d;
+  --surface: #0e1016;
+  --surface-2: #14171f;
+  --border: #20242f;
+  --muted: #7b8291;
+  --fg: #eef1f6;
+  --fg-dim: #a3abba;
+  --accent: #7c7bff;
+  --accent-fg: #ffffff;
+  --accent-dim: #2a2b6b;
+  --danger: #ff5c6c;
+  --warn: #ffb020;
+  --ok: #34d399;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image: radial-gradient(60% 40% at 80% -10%, rgba(124, 123, 255, 0.10), transparent 60%),
+    radial-gradient(50% 40% at -10% 0%, rgba(52, 211, 153, 0.06), transparent 55%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: #fff;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #23272f;
+  border-radius: 10px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2d323d;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border bg-surface;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:brightness-110 shadow-[0_8px_30px_-8px_rgba(124,123,255,0.6)];
+  }
+  .btn-ghost {
+    @apply btn border bg-surface text-fg hover:bg-surface-2;
+  }
+  .btn-subtle {
+    @apply btn text-fg-dim hover:text-fg hover:bg-surface-2;
+  }
+  .input {
+    @apply w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-fg placeholder:text-muted outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/20 transition;
+  }
+  .label {
+    @apply block text-xs font-medium text-fg-dim mb-1.5;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border bg-surface-2 px-2.5 py-1 text-xs text-fg-dim;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface-2;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+.animate-in {
+  animation: fade-in 0.35s ease-out both;
+}
