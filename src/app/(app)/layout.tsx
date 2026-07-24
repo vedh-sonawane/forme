@@ -6,8 +6,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <Sidebar aiLive={aiLive} />
-      <main className="pl-[248px]">
-        <div className="mx-auto min-h-screen max-w-[1400px] px-8 py-8">{children}</div>
+      <main className="pt-14 lg:pt-0 lg:pl-[248px]">
+        <div className="mx-auto min-h-screen max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>
     </div>
   );

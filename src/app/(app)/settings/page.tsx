@@ -28,8 +28,8 @@ export default async function SettingsPage() {
 
   return (
     <div className="animate-in max-w-3xl">
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-      <p className="mt-1 text-sm text-fg-dim">Environment, AI provider, and system status.</p>
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Settings</h1>
+      <p className="mt-1.5 text-sm text-fg-dim">Environment, AI provider, and system status.</p>
 
       <Card className="mt-6">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-fg-dim">System status</h2>
@@ -43,10 +43,10 @@ export default async function SettingsPage() {
         </div>
       </Card>
 
-      <div className="mt-4 grid grid-cols-3 gap-4">
-        <Card><div className="text-2xl font-bold">{projects}</div><div className="text-xs text-muted">projects</div></Card>
-        <Card><div className="text-2xl font-bold">{refs}</div><div className="text-xs text-muted">references</div></Card>
-        <Card><div className="text-2xl font-bold">{aiCalls}</div><div className="text-xs text-muted">AI calls logged</div></Card>
+      <div className="mt-4 grid grid-cols-3 gap-3 sm:gap-4">
+        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{projects}</div><div className="mt-0.5 text-xs text-muted">projects</div></Card>
+        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{refs}</div><div className="mt-0.5 text-xs text-muted">references</div></Card>
+        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{aiCalls}</div><div className="mt-0.5 text-xs text-muted">AI calls logged</div></Card>
       </div>
 
       {!aiLive && (

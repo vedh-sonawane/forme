@@ -45,8 +45,8 @@ export function CreateProjectDialog() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm animate-in" onClick={() => !busy && setOpen(false)}>
-          <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="card w-full max-w-lg p-6">
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4 backdrop-blur-sm animate-in" onClick={() => !busy && setOpen(false)}>
+          <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="card max-h-[90vh] w-full max-w-lg overflow-y-auto p-6">
             <h2 className="text-lg font-semibold">Create a project</h2>
             <p className="mt-1 text-sm text-fg-dim">A workspace for references, design direction, and generated versions.</p>
 

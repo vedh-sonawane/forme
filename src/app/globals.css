@@ -60,27 +60,69 @@ body {
 @layer components {
   .card {
     @apply rounded-2xl border bg-surface;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 18px 44px -32px rgba(0, 0, 0, 0.9);
+  }
+  /* Interactive card (grid tiles / links): premium lift + accent ring on hover. */
+  .card-link {
+    @apply card transition duration-200 ease-out;
+  }
+  .card-link:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    transform: translateY(-3px);
+    box-shadow: 0 24px 48px -28px rgba(0, 0, 0, 0.95), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn:active {
+    transform: translateY(1px);
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:brightness-110 shadow-[0_8px_30px_-8px_rgba(124,123,255,0.6)];
+    @apply btn text-white;
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #ffffff), var(--accent));
+    box-shadow: 0 10px 28px -12px rgba(124, 123, 255, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.07);
+    box-shadow: 0 14px 34px -12px rgba(124, 123, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.24);
   }
   .btn-ghost {
-    @apply btn border bg-surface text-fg hover:bg-surface-2;
+    @apply btn border bg-surface text-fg;
+  }
+  .btn-ghost:hover {
+    background: var(--surface-2);
+    border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
   }
   .btn-subtle {
-    @apply btn text-fg-dim hover:text-fg hover:bg-surface-2;
+    @apply btn text-fg-dim;
+  }
+  .btn-subtle:hover {
+    color: var(--fg);
+    background: var(--surface-2);
   }
   .input {
-    @apply w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-fg placeholder:text-muted outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/20 transition;
+    @apply w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-fg placeholder:text-muted outline-none transition;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+  }
+  .input:focus {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
   }
   .label {
     @apply block text-xs font-medium text-fg-dim mb-1.5;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border bg-surface-2 px-2.5 py-1 text-xs text-fg-dim;
+    @apply inline-flex items-center gap-1.5 rounded-full border bg-surface-2 px-2.5 py-1 text-xs text-fg-dim transition;
+  }
+  .chip:hover {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  }
+  /* Frosted bar used by the responsive sidebar + mobile top bar. */
+  .glass {
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
   }
   .skeleton {
     @apply relative overflow-hidden rounded-lg bg-surface-2;
