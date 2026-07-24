@@ -1,8 +1,8 @@
 import { generateRaw, usingRealAI } from "@/lib/ai/provider";
 import { prompts } from "@/lib/prompts/registry";
 import { renderBaseline } from "@/lib/generation/baseline";
-import { systemToCss } from "@/lib/generation/css";
-import type { DesignSystem, DesignDirection, Requirements, WebsitePlan, Critique } from "@/lib/design/schema";
+import { systemToCss, CLASS_GUIDE } from "@/lib/generation/css";
+import type { DesignSystem, DesignDirection, Requirements, WebsitePlan, ScenePlan, Critique } from "@/lib/design/schema";
 import type { AiCallMeta } from "@/lib/ai/types";
 
 // Failsafe: guarantee scroll-reveal content becomes visible even if the model's
@@ -39,8 +39,9 @@ export async function generateWebsiteCode(input: {
   direction: DesignDirection;
   system: DesignSystem;
   plan: WebsitePlan;
+  scenes: ScenePlan;
 }): Promise<CodeGenResult> {
-  // Always compute the guaranteed-valid baseline first.
+  // Always compute the guaranteed-valid, scene-driven baseline first.
   const baseline = injectFailsafe(renderBaseline(input));
 
   if (!usingRealAI()) {
@@ -66,15 +67,15 @@ export async function generateWebsiteCode(input: {
     operation: p.operation,
     promptVersion: "code-generation-v1",
     model: "pro",
-    maxOutputTokens: 40000,
-    temperature: 0.7,
+    maxOutputTokens: 48000,
+    temperature: 0.85,
     thinking: false,
     ...p.build({
       requirements: JSON.stringify(input.requirements),
       directionJson: JSON.stringify(input.direction),
       systemCss: css,
-      planJson: JSON.stringify(input.plan),
-      baseline,
+      sceneJson: JSON.stringify(input.scenes),
+      classGuide: CLASS_GUIDE,
     }),
   });
 
@@ -138,6 +139,7 @@ export async function improveWebsiteCode(input: {
   direction: DesignDirection;
   requirements: Requirements;
   plan: WebsitePlan;
+  scenes?: ScenePlan | null;
   critique: Critique;
 }): Promise<CodeGenResult & { changeNote: string; systemUsed: DesignSystem }> {
   const targeted = input.critique.issues.slice(0, 6);
@@ -145,7 +147,7 @@ export async function improveWebsiteCode(input: {
   if (!usingRealAI()) {
     // Deterministic improvement: nudge tokens per issue categories and re-render.
     const { system, notes } = nudgeSystem(input.system, targeted);
-    const html = injectFailsafe(renderBaseline({ system, direction: input.direction, requirements: input.requirements, plan: input.plan }));
+    const html = injectFailsafe(renderBaseline({ system, direction: input.direction, requirements: input.requirements, plan: input.plan, scenes: input.scenes }));
     return {
       html,
       systemUsed: system,
@@ -181,7 +183,7 @@ export async function improveWebsiteCode(input: {
   }
   // Fallback to deterministic nudge.
   const { system, notes } = nudgeSystem(input.system, targeted);
-  const fbHtml = injectFailsafe(renderBaseline({ system, direction: input.direction, requirements: input.requirements, plan: input.plan }));
+  const fbHtml = injectFailsafe(renderBaseline({ system, direction: input.direction, requirements: input.requirements, plan: input.plan, scenes: input.scenes }));
   return {
     html: fbHtml,
     systemUsed: system,

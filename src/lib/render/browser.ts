@@ -208,7 +208,16 @@ async function forceReveal(page: any) {
         if (parseFloat(cs.opacity) < 0.05) {
           el.style.opacity = "1";
           el.style.transform = "none";
+          el.style.filter = "none";
+          (el.style as unknown as { clipPath: string }).clipPath = "none";
         }
+      });
+      // Finalize count-up numbers so the screenshot shows the final value, not mid-animation.
+      document.querySelectorAll<HTMLElement>("[data-countup]").forEach((el) => {
+        const raw = el.getAttribute("data-countup") || "";
+        const pre = el.getAttribute("data-prefix") || "";
+        const suf = el.getAttribute("data-suffix") || "";
+        el.textContent = pre + raw + suf;
       });
       return (document as unknown as { fonts?: { ready?: Promise<unknown> } }).fonts?.ready;
     });

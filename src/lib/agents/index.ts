@@ -6,6 +6,7 @@ import {
   DesignDirectionSchema,
   DesignSystemSchema,
   WebsitePlanSchema,
+  ScenePlanSchema,
   RequirementsSchema,
   CritiqueSchema,
   QualityEvalSchema,
@@ -13,6 +14,7 @@ import {
   type DesignDirection,
   type DesignSystem,
   type WebsitePlan,
+  type ScenePlan,
   type Requirements,
   type Critique,
   type QualityEval,
@@ -84,6 +86,15 @@ export async function planWebsite(requirements: Requirements, direction: DesignD
   return structured(
     { operation: p.operation, promptVersion: "website-architecture-v1", model: "flash", ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
     WebsitePlanSchema
+  );
+}
+
+// ── Scene Director: direct the cinematic scroll experience ──────────────────────
+export async function planSceneExperience(requirements: Requirements, direction: DesignDirection): Promise<StructuredResult<ScenePlan>> {
+  const p = prompts["scene-plan-v1"];
+  return structured(
+    { operation: p.operation, promptVersion: "scene-plan-v1", model: "pro", ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
+    ScenePlanSchema
   );
 }
 

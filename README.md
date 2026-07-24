@@ -14,7 +14,7 @@ Built to solve the core failure of AI website builders: technically-working but 
 | **Upload screenshots** → vision analysis → **Design DNA** | ✅ working |
 | **Design DNA profiles** (structured, ~30 fields) + library | ✅ working |
 | **Idea → Design Direction → Design System** (real tokens) | ✅ working |
-| **Generate a real, responsive website** (real HTML/CSS, semantic, animated) | ✅ working |
+| **Generate a real, responsive website** — **art-directed** per brand (a Creative Blueprint picks the visual language — editorial / brutalist / swiss / luxury / nature / technical / cinematic … **never a default look**) then directed as a sequence of distinct scenes with **brand-proportional atmosphere** and one **signature moment** | ✅ working |
 | **Render in a real browser** (Playwright) + live sandboxed preview | ✅ working |
 | **Visual Critic** → multi-dimensional structured critique + fixes | ✅ working |
 | **Improvement loop** with **regression detection + revert + version history** | ✅ working |
@@ -38,8 +38,9 @@ Every AI stage falls back to a **clearly-marked development provider** if the mo
 ### Architecture highlights
 - **Provider abstraction** (`src/lib/ai/`): `GeminiProvider` + `MockProvider`, a `structured()` helper (JSON + zod validation + repair-retry + graceful fallback), and **full AI-call logging** (`AiCall`: model, prompt version, tokens, latency, errors).
 - **Versioned prompt registry** (`src/lib/prompts/registry.ts`) — named, versioned, injection-guarded prompts (`visual-critique-v1`, …).
-- **Specialized agents** (`src/lib/agents/`): Requirement Analyst · Reference Analyst · DNA Extractor/Synthesizer · Design Director · Design System Generator · Website Architect · Code Generator · Visual Critic · Improvement Agent.
-- **Deterministic baseline renderer** (`src/lib/generation/baseline.ts`) — a guaranteed-valid, high-quality site that anchors the LLM output and serves as the fallback.
+- **Specialized agents** (`src/lib/agents/`): Requirement Analyst · Reference Analyst · DNA Extractor/Synthesizer · Design Director · Design System Generator · Website Architect · **Scene Director** · Code Generator · Visual Critic · Improvement Agent.
+- **Art-directed pipeline**: idea → **Creative Blueprint** (art direction chosen for THIS brand — *not* defaulted to cinematic — plus emotional arc, motion language, `atmosphere` level, and one **signature moment**) → design system → **scene plan** (each scene carries composition, visual style, density, emotion, background, spacing pace & motion) → code generation. The generator adopts the art direction and keeps **atmosphere proportional** — a swiss/editorial brand gets zero glow/grain/orbs; a nature/luxury brand gets layered depth. No two briefs share a look.
+- **Scene-based renderer** (`src/lib/generation/baseline.ts`) — a library of distinct scene renderers with a rich visual + **motion runtime** (`css.ts`: scene backgrounds, glow/mesh/grain depth, dramatic type, reveal variants, parallax, count-up, tilt, marquee — all screenshot-safe), all **gated by the brand's atmosphere**. It renders the blueprint deterministically as the fallback, so even the no-key path is art-directed and varied.
 - **Security** (`src/lib/security/url-guard.ts`): SSRF guard (blocks localhost/private/link-local/metadata IPs, DNS-resolve check, redirect re-validation), untrusted content treated as data (never instructions), sandboxed iframes + CSP on served artifacts.
 
 ---

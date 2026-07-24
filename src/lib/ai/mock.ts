@@ -119,19 +119,58 @@ function designDNA(seed: number) {
   };
 }
 
-function designDirection(seed: number) {
+// Brand-appropriate art direction chosen from the brief's language — the mock must NOT
+// default everything to "cinematic". Atmosphere gates how much depth/effect is used.
+type Art = { dir: string; atmo: "none" | "restrained" | "rich"; motion: string; arc: string[] };
+const ART_MAP: { kw: RegExp; a: Art }[] = [
+  { kw: /lux|premium|elegan|couture|fashion|jewel|boutique|bespoke|heritage/i, a: { dir: "luxury", atmo: "restrained", motion: "slow, elegant fades", arc: ["allure", "desire", "trust", "aspiration"] } },
+  { kw: /brutal|\bbold\b|raw|edgy|street|under\s?ground|punk|zine/i, a: { dir: "brutalist", atmo: "none", motion: "snappy, mechanical cuts", arc: ["impact", "tension", "conviction", "urgency"] } },
+  { kw: /nature|organic|eco|forest|garden|wellness|medit|sleep|calm|retreat|plant|ocean|mountain|botanic/i, a: { dir: "nature / organic", atmo: "rich", motion: "gentle parallax + layered reveals", arc: ["wonder", "calm", "curiosity", "belonging", "commitment"] } },
+  { kw: /minimal|clean|simple|fintech|bank|invoice|account|ledger|payroll|dashboard/i, a: { dir: "swiss minimal", atmo: "none", motion: "restrained fades", arc: ["clarity", "confidence", "trust", "action"] } },
+  { kw: /space|cosmos|star|galaxy|immersi|cinema|film|orbit|aerospace|vr|metaverse/i, a: { dir: "cinematic", atmo: "rich", motion: "layered parallax + reveals", arc: ["wonder", "awe", "curiosity", "desire", "commitment"] } },
+  { kw: /\bai\b|robot|api|dev|data|cloud|cyber|tech|engine|infra|platform|sdk|devops/i, a: { dir: "technical", atmo: "restrained", motion: "precise, structured reveals", arc: ["curiosity", "confidence", "trust", "momentum"] } },
+  { kw: /kid|\bplay|fun|game|toy|creative|comic|party|mascot/i, a: { dir: "playful", atmo: "restrained", motion: "bouncy micro-interactions", arc: ["delight", "playfulness", "joy", "action"] } },
+  { kw: /editor|magazine|news|journal|story|blog|publish|essay|documentary/i, a: { dir: "editorial", atmo: "none", motion: "restrained fades", arc: ["intrigue", "immersion", "insight", "resonance"] } },
+];
+function pickArt(text: string): Art {
+  for (const m of ART_MAP) if (m.kw.test(text)) return m.a;
+  return { dir: "modern minimal", atmo: "restrained", motion: "quiet fades", arc: ["clarity", "interest", "trust", "action"] };
+}
+
+// Only the BRIEF text (business + industry + tone) drives art selection — never the
+// prompt boilerplate (e.g. the field name "signature_moment" contains "nature").
+function briefText(promptUser: string): string {
+  const b = promptUser.match(/"business"\s*:\s*"([^"]*)"/)?.[1] || "";
+  const p = promptUser.match(/"product"\s*:\s*"([^"]*)"/)?.[1] || "";
+  const ind = promptUser.match(/"industry"\s*:\s*"([^"]*)"/)?.[1] || "";
+  const tone = promptUser.match(/"tone"\s*:\s*\[([^\]]*)\]/)?.[1] || "";
+  return [b, p, ind, tone].filter(Boolean).join(" ");
+}
+
+function designDirection(seed: number, promptUser: string) {
   const r = rng(seed);
+  const art = pickArt(briefText(promptUser));
+  const clean = art.atmo === "none";
   return {
-    visual_concept: "A calm, confident, high-contrast interface that feels engineered and premium — restraint over decoration.",
-    design_personality: [pick(MOODS, r()), pick(MOODS, r()), "intentional"],
-    typography_direction: "Geometric display sans for headlines with tight tracking; humanist sans for body. Big display-to-body jump.",
-    color_direction: "Near-neutral canvas with a single saturated primary and one cool accent used sparingly.",
-    layout_direction: "Narrative single-column with full-bleed hero, alternating feature rows, and a strong closing CTA band.",
-    component_direction: "Pill buttons, soft-radius bordered cards, slim sticky nav, low diffuse shadows.",
-    imagery_direction: "Abstract gradient/3D hero visual plus crisp product UI mockups; avoid generic stock photos.",
-    motion_direction: "Subtle fade-and-rise reveals on scroll and gentle hover lifts; nothing bouncy.",
-    avoid: ["generic stock imagery", "rainbow gradients", "competing CTAs", "cramped spacing", "center-everything monotony"],
-    rationale: "Synthesizes the references' clarity and restraint while giving the brand a distinct, ownable accent and rhythm.",
+    art_direction: art.dir,
+    atmosphere: art.atmo,
+    motion_language: art.motion,
+    emotional_arc: art.arc,
+    signature_moment: {
+      description: clean ? "One oversized, perfectly-set typographic statement that anchors the whole page." : "A single focal reveal — the brand's promise crystallized in one memorable moment.",
+      placement: "middle of the scroll",
+      brand_fit: `Fits a ${art.dir} brand: it lifts perceived quality without fighting the content.`,
+    },
+    visual_concept: `A ${art.dir} experience — ${clean ? "clean, confident, and restrained" : "deliberate and atmospheric"}, tailored to the brand rather than a template.`,
+    design_personality: art.arc.slice(0, 2).concat(art.dir),
+    typography_direction: clean ? "Strong type hierarchy carries the page; large restrained headlines, generous whitespace, no decoration." : "Expressive display headlines against calm body; dramatic scale jumps for emphasis.",
+    color_direction: "A disciplined palette — one canvas, one primary, one accent used sparingly.",
+    layout_direction: "Scene-based composition: alternating structure and rhythm, never a repeated block.",
+    component_direction: clean ? "Crisp rules and hairlines, square-ish cards, minimal shadow." : "Soft-radius panels, tasteful depth, considered shadows.",
+    imagery_direction: clean ? "Editorial type and clean diagrams over decorative graphics." : "CSS/SVG-drawn visuals — illustration, mockups, or layered gradient scenes as the art direction fits.",
+    motion_direction: art.motion,
+    avoid: ["generic stock imagery", "competing CTAs", "cramped spacing", clean ? "glow/grain/orb atmosphere" : "the same effect on every scene", "defaulting to a cinematic template"],
+    rationale: `${art.dir} chosen for this brand; atmosphere kept "${art.atmo}" so effects stay proportional and on-brand.`,
   };
 }
 
@@ -208,6 +247,103 @@ function requirements(promptUser: string) {
   };
 }
 
+// A varied, cinematic scene plan — different briefs (and seeds) yield different
+// layouts / backgrounds / rhythm, so even the fallback path is scene-driven, not a
+// single repeated template.
+function scenePlan(promptUser: string, seed: number) {
+  const r = rng(seed);
+  // The scene-plan prompt embeds the requirements as JSON; read business/product from
+  // it (fall back to idea extraction) so the mock never leaks prompt scaffolding.
+  const bMatch = promptUser.match(/"business"\s*:\s*"([^"]*)"/);
+  const pMatch = promptUser.match(/"product"\s*:\s*"([^"]*)"/);
+  const business = (bMatch ? bMatch[1] : extractIdea(promptUser)) || "your product";
+  const product = pMatch ? pMatch[1] : "";
+  const brand = deriveBrand(product && product.trim() ? product : business);
+  const short = business.split(/(?<=[.!?])\s+/)[0].replace(/^(?:an?|the)\s+/i, "");
+
+  // Honor the art direction's atmosphere (parsed from the direction JSON in the prompt):
+  // clean brands get NO glow/gradient/grain; rich brands get the full atmospheric set.
+  const atmosphere = (promptUser.match(/"atmosphere"\s*:\s*"([^"]*)"/)?.[1] || "restrained").toLowerCase();
+  const art = promptUser.match(/"art_direction"\s*:\s*"([^"]*)"/)?.[1] || "modern minimal";
+  const rich = atmosphere === "rich";
+  const clean = atmosphere === "none";
+
+  const experienceLayouts = ["split-image", "showcase", "feature-spotlight"];
+  const storyLayouts = clean ? ["comparison", "steps", "timeline"] : ["gallery", "timeline", "comparison", "steps"];
+  const heroLayout = pick(["hero-centered", "hero-split"], r());
+  const experience = pick(experienceLayouts, r());
+  const story = pick(storyLayouts, r());
+
+  // Background palettes gated by atmosphere (no gradient/glow when clean).
+  const cleanBgs = ["base", "surface", "contrast", "tint", "base", "surface", "tint", "contrast"];
+  const richBgs = pick([["glow", "surface", "gradient", "base", "contrast", "glow", "surface", "gradient"], ["gradient", "base", "glow", "surface", "contrast", "tint", "base", "gradient"]], r());
+  const restrainedBgs = pick([["base", "surface", "tint", "contrast", "base", "gradient", "surface", "contrast"], ["surface", "base", "contrast", "tint", "base", "surface", "tint", "contrast"]], r());
+  const bgCycle = clean ? cleanBgs : rich ? richBgs : restrainedBgs;
+
+  const spaceCycle = pick([["airy", "huge", "airy", "airy", "huge", "airy", "normal", "huge"], ["airy", "tight", "airy", "huge", "airy", "airy", "normal", "huge"]], r());
+  const cleanMotions = ["fade-up", "fade-up", "stagger", "fade-up", "none", "stagger", "fade-up", "fade-up"];
+  const richMotions = ["mask", "fade-up", "parallax", "countup", "blur", "stagger", "fade-up", "mask"];
+  const motions = clean ? cleanMotions : rich ? richMotions : ["fade-up", "fade-up", "parallax", "countup", "fade-up", "stagger", "fade-up", "fade-up"];
+  const compositions = pick([["centered", "editorial", "split", "offset", "asymmetric", "magazine", "split", "centered"], ["centered", "split", "offset", "editorial", "immersive", "asymmetric", "magazine", "centered"]], r());
+  const cleanStyles = ["editorial-type", "none", "product-mockup", "data-viz", "none", "minimal-diagram", "none", "editorial-type"];
+  const richStyles = ["gradient-mesh", "svg-landscape", "product-mockup", "data-viz", "3d-object", "abstract-shapes", "none", "gradient-mesh"];
+  const styles = clean ? cleanStyles : rich ? richStyles : ["product-mockup", "none", "css-illustration", "data-viz", "none", "isometric", "none", "editorial-type"];
+  const densities = ["rich", "minimal", "rich", "medium", "minimal", "rich", "minimal", "medium"];
+  const emotions = ["wonder", "curiosity", "delight", "confidence", "trust", "calm", "clarity", "urgency"];
+  const SIGNATURE = 2; // the experience scene is the mid-scroll signature moment
+
+  const feats = [
+    { title: "Considered by default", body: "Type, spacing, and motion work together so every screen feels intentional.", meta: "01" },
+    { title: "Built to scale", body: "From launch to serious scale, with no rewrites required.", meta: "02" },
+    { title: "Fast and reliable", body: "Speed and stability are features here, not afterthoughts.", meta: "03" },
+  ];
+
+  const scene = (i: number, o: Partial<Record<string, unknown>>) => ({
+    id: String(i + 1),
+    title: "",
+    role: "",
+    question: "",
+    layout: "cards",
+    composition: compositions[i] || "centered",
+    visual_style: styles[i] || "none",
+    density: densities[i] || "medium",
+    emotion: emotions[i] || "confidence",
+    background: bgCycle[i] || "base",
+    spacing: spaceCycle[i] || "airy",
+    emphasis: "minimal",
+    motion: motions[i] || "fade-up",
+    interaction: "",
+    visual_idea: "",
+    signature: i === SIGNATURE,
+    eyebrow: "",
+    headline: "",
+    subcopy: "",
+    visual: "",
+    items: [] as { title: string; body: string; meta: string }[],
+    ...o,
+  });
+
+  return {
+    concept: `A ${art} experience that makes ${brand} feel intentional${clean ? " and effortless" : rich ? " and alive" : ""}.`,
+    narrative: "Open with a clear statement, explain why it matters, show the experience, prove it, let real voices speak, answer questions, then close with intent.",
+    scenes: [
+      scene(0, { title: "The opening", role: "opening", question: "What is this?", layout: heroLayout, emphasis: "oversized", visual_idea: clean ? "One oversized typographic statement, generous whitespace" : "A single focal form floating over a quiet field", eyebrow: "Introducing", headline: capitalize(short), subcopy: `The experience ${brand} was built to deliver.` }),
+      scene(1, { title: "Why it exists", role: "context", question: "Why does this exist?", layout: "statement", emphasis: "editorial", visual_idea: "A calm full-bleed statement, nothing competing", headline: `Most tools settle. ${brand} was built to feel different.` }),
+      scene(2, { title: "The experience", role: "experience", question: "How does it work?", layout: experience, emphasis: "image", interaction: clean ? "subtle hover reveal" : "pointer-based depth", visual_idea: "The product shown in its most flattering moment — the signature beat", eyebrow: "The experience", headline: "Designed to be felt, not just used.", subcopy: "Every screen is composed with intention — clear hierarchy, honest spacing, and motion that guides the eye.", items: feats }),
+      scene(3, { title: "The proof", role: "proof", question: "Does it deliver?", layout: "metrics", emphasis: "number", visual_idea: "Oversized numbers counting up", headline: "Numbers that speak for themselves.", items: [{ title: "99.9%", body: "uptime, guaranteed", meta: "" }, { title: "3.2x", body: "faster in practice", meta: "" }, { title: "12k+", body: "teams onboard", meta: "" }] }),
+      scene(4, { title: "Voices", role: "emotional", question: "Who loves it?", layout: "quote", emphasis: "editorial", visual_idea: "A single large quote, set beautifully", headline: `Switching to ${brand} was the clearest decision we made all year.`, subcopy: "Head of Product, a technology company" }),
+      scene(5, { title: "The story", role: "calm", question: "What does it feel like?", layout: story, emphasis: "image", visual_idea: "A closer, calmer look at the details", eyebrow: "Closer look", headline: "Composed with intention.", items: feats.concat([{ title: "Made for people", body: "Accessible, responsive, a pleasure to use.", meta: "04" }, { title: "Always improving", body: "Thoughtful iteration keeps it sharp.", meta: "05" }, { title: "Secure by default", body: "Sensible protection throughout.", meta: "06" }]) }),
+      scene(6, { title: "Questions", role: "faq", question: "What should I know?", layout: "faq", emphasis: "minimal", visual_idea: "Quiet, scannable answers", eyebrow: "Questions", headline: "Good to know.", items: [{ title: `What makes ${brand} different?`, body: "Intentional design at every layer — not a template.", meta: "" }, { title: "Is it responsive?", body: "Yes — it's composed mobile-first and adapts fluidly.", meta: "" }, { title: "How fast can I start?", body: "Minutes. There's nothing to wrestle with.", meta: "" }, { title: "Can I make it my own?", body: "Absolutely — everything is editable after generation.", meta: "" }] }),
+      scene(7, { title: "The close", role: "climax", question: "What now?", layout: "cta", emphasis: "oversized", visual_idea: "A confident closing line and a single clear action", headline: `Ready to begin with ${brand}?`, subcopy: "Join the teams already building something considered." }),
+    ],
+  };
+}
+
+function capitalize(s: string) {
+  const t = (s || "").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function websitePlan() {
   return {
     pages: [
@@ -278,13 +414,16 @@ export class MockProvider implements AiProvider {
         payload = requirements(opts.user);
         break;
       case "design-direction":
-        payload = designDirection(seed);
+        payload = designDirection(seed, opts.user);
         break;
       case "design-system":
         payload = designSystem(seed);
         break;
       case "website-architecture":
         payload = websitePlan();
+        break;
+      case "scene-plan":
+        payload = scenePlan(opts.user, seed);
         break;
       case "visual-critique":
         payload = critique(seed);

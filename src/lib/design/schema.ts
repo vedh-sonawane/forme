@@ -81,8 +81,21 @@ export const DesignDNASchema = z.object({
 });
 export type DesignDNA = z.infer<typeof DesignDNASchema>;
 
-// ── DESIGN DIRECTION ──────────────────────────────────────────────────────────
+// ── DESIGN DIRECTION (the Creative Blueprint / art direction) ────────────────────
+// Art direction is chosen to fit the BRAND — it must NOT default to "cinematic".
+// It drives every downstream decision (scene plan, code, atmosphere, motion).
 export const DesignDirectionSchema = z.object({
+  // Named visual language chosen for THIS brand, e.g. "editorial", "brutalist",
+  // "swiss minimal", "luxury", "nature/organic", "technical", "playful", "retro",
+  // "documentary", "magazine", "cinematic minimalism" … (cinematic is ONE option, not the default).
+  art_direction: str,
+  motion_language: str, // e.g. "restrained fades", "gentle parallax", "snappy/mechanical", "none"
+  emotional_arc: strArr, // e.g. ["wonder","curiosity","trust","delight","commitment"]
+  // How much atmospheric effect suits the brand: "none" | "restrained" | "rich".
+  // Minimal/Swiss/editorial → none/restrained; nature/luxury/tech → restrained/rich.
+  atmosphere: str,
+  // The single most memorable moment (placed mid-scroll), and why it fits the brand.
+  signature_moment: z.object({ description: str, placement: str, brand_fit: str }).default({}),
   visual_concept: str,
   design_personality: strArr,
   typography_direction: str,
@@ -161,6 +174,53 @@ export const DesignSystemSchema = z.object({
     .default({}),
 });
 export type DesignSystem = z.infer<typeof DesignSystemSchema>;
+
+// ── SCENE PLAN (cinematic scroll experience) ─────────────────────────────────────
+// The page is directed as a sequence of distinct SCENES (not stacked sections). Each
+// scene has its own narrative role, layout, background, spacing scale, typographic
+// emphasis and motion — so no two scenes look alike and the scroll feels like a film.
+export const SceneSchema = z.object({
+  id: str,
+  title: str, // internal scene name, e.g. "The forest opens"
+  // narrative beat: opening | context | problem | experience | proof | emotional | calm | people | faq | climax
+  role: str,
+  question: str, // the ONE question this scene answers
+  // distinct layout (renderer maps unknowns to a safe default):
+  // hero-centered | hero-split | statement | split-image | feature-spotlight | showcase |
+  // cards | metrics | quote | timeline | steps | gallery | marquee | comparison | faq | cta
+  layout: str,
+  // Compositional strategy (eye-flow), NOT just a surface layout:
+  // centered | split | editorial | magazine | offset | overlapping | diagonal | masonry | immersive | floating | asymmetric
+  composition: str,
+  // Planned visual asset for the focal element (drives real imagery, not icons):
+  // none | css-illustration | svg-landscape | gradient-mesh | product-mockup | device-frame |
+  // isometric | abstract-shapes | data-viz | editorial-type | photography-slot | 3d-object
+  visual_style: str,
+  density: str, // minimal | medium | rich | immersive  (alternate sparse/dense on purpose)
+  emotion: str, // wonder | calm | energy | confidence | mystery | nostalgia | playfulness | luxury | curiosity | urgency
+  background: str, // base | surface | contrast | gradient | glow | tint
+  spacing: str, // tight | normal | airy | huge
+  emphasis: str, // oversized | number | editorial | image | minimal | data
+  motion: str, // fade-up | stagger | mask | parallax | pinned | countup | tilt | mouse | marquee | zoom | none
+  interaction: str, // the one interaction, if any (e.g. "pointer-based depth", "hover reveal")
+  visual_idea: str, // the ONE memorable visual idea for this scene
+  signature: z.boolean().default(false), // true for the single Signature Moment scene
+  eyebrow: str,
+  headline: str,
+  subcopy: str,
+  visual: str, // short description of the focal visual for this scene
+  items: z
+    .array(z.object({ title: str, body: str, meta: str }))
+    .default([]),
+});
+export type Scene = z.infer<typeof SceneSchema>;
+
+export const ScenePlanSchema = z.object({
+  concept: str, // the cinematic concept for the whole experience
+  narrative: str, // one-line description of the emotional arc
+  scenes: z.array(SceneSchema).default([]),
+});
+export type ScenePlan = z.infer<typeof ScenePlanSchema>;
 
 // ── WEBSITE PLAN (architecture) ─────────────────────────────────────────────────
 export const WebsitePlanSchema = z.object({

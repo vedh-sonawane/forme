@@ -6,6 +6,7 @@ import {
   generateDirection,
   generateDesignSystem,
   planWebsite,
+  planSceneExperience,
   synthesizeDNA,
   critiqueWebsite,
 } from "@/lib/agents";
@@ -17,6 +18,7 @@ import {
   DesignSystemSchema,
   RequirementsSchema,
   WebsitePlanSchema,
+  ScenePlanSchema,
   CritiqueSchema,
   type DesignDNA,
   type Requirements,
@@ -131,10 +133,12 @@ export async function generateProjectWebsite(projectId: string, directionId?: st
   await db.project.update({ where: { id: projectId }, data: { status: "generating" } });
 
   const plan = await planWebsite(requirements, direction);
-  const code = await generateWebsiteCode({ requirements, direction, system, plan: WebsitePlanSchema.parse(plan.data) });
+  const sceneRes = await planSceneExperience(requirements, direction);
+  const scenes = ScenePlanSchema.parse(sceneRes.data);
+  const code = await generateWebsiteCode({ requirements, direction, system, plan: WebsitePlanSchema.parse(plan.data), scenes });
 
   const site = await db.generatedWebsite.create({
-    data: { projectId, directionId: dirRow.id, kind: "new", title: `${project.name} — v1`, status: "rendered" },
+    data: { projectId, directionId: dirRow.id, kind: "new", title: `${project.name} — v1`, status: "rendered", scenePlan: toJSON(scenes) },
   });
   const htmlPath = await saveText(`sites/html`, `${site.id}-v1.html`, code.html);
   const version = await db.websiteVersion.create({
@@ -201,10 +205,12 @@ export async function redesignProjectWebsite(projectId: string) {
   await db.project.update({ where: { id: projectId }, data: { status: "generating" } });
 
   const plan = await planWebsite(requirements, dir.data);
-  const code = await generateWebsiteCode({ requirements, direction: dir.data, system: sys.data, plan: WebsitePlanSchema.parse(plan.data) });
+  const sceneRes = await planSceneExperience(requirements, dir.data);
+  const scenes = ScenePlanSchema.parse(sceneRes.data);
+  const code = await generateWebsiteCode({ requirements, direction: dir.data, system: sys.data, plan: WebsitePlanSchema.parse(plan.data), scenes });
 
   const site = await db.generatedWebsite.create({
-    data: { projectId, directionId: direction.id, kind: "redesign", title: `${target.title || project.name} — redesign`, status: "rendered" },
+    data: { projectId, directionId: direction.id, kind: "redesign", title: `${target.title || project.name} — redesign`, status: "rendered", scenePlan: toJSON(scenes) },
   });
   await saveText(`sites/html`, `${site.id}-v1.html`, code.html);
   const newVersion = await db.websiteVersion.create({
@@ -238,10 +244,11 @@ export async function improveWebsite(websiteId: string) {
   const system = sysRow ? DesignSystemSchema.parse(parseJSON(sysRow.tokens, {})) : DesignSystemSchema.parse({});
   const plan = WebsitePlanSchema.parse((await planWebsite(requirements, direction)).data);
   const critique = CritiqueSchema.parse(parseJSON(critRow.report, {}));
+  const scenes = site.scenePlan ? ScenePlanSchema.parse(parseJSON(site.scenePlan, {})) : null;
 
   const scoreBefore = current.overallScore ?? critique.overall_score;
 
-  const improved = await improveWebsiteCode({ html: current.html, system, direction, requirements, plan, critique });
+  const improved = await improveWebsiteCode({ html: current.html, system, direction, requirements, plan, scenes, critique });
 
   const nextVersionNum = current.version + 1;
   const newVersion = await db.websiteVersion.create({

@@ -246,6 +246,7 @@ model GeneratedWebsite {
   kind        String   @default("new") // new | redesign
   title       String?
   status      String   @default("draft") // draft | rendered | critiqued | improving | final
+  scenePlan   String? // cinematic scene plan (JSON) — reused by the improvement loop's fallback
   currentVersionId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
