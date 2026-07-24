@@ -1,6 +1,6 @@
 import { Card, Badge } from "@/components/ui";
 import { usingRealAI } from "@/lib/ai/provider";
-import { env, resolveProvider } from "@/lib/env";
+import { env, resolveProvider, hasOpenRouter, hasGemini } from "@/lib/env";
 import { browserAvailable } from "@/lib/render/browser";
 import { db } from "@/lib/db";
 
@@ -17,10 +17,12 @@ export default async function SettingsPage() {
   ]);
 
   const rows: { label: string; value: string; tone?: "ok" | "warn" | "default" | "accent" }[] = [
-    { label: "AI provider", value: provider, tone: aiLive ? "ok" : "warn" },
-    { label: "Vision + reasoning model", value: env.geminiModelPro },
-    { label: "Fast model", value: env.geminiModelFlash },
-    { label: "API key", value: env.geminiApiKey ? "configured" : "missing (using mock)", tone: env.geminiApiKey ? "ok" : "warn" },
+    { label: "Active provider (primary)", value: provider, tone: aiLive ? "ok" : "warn" },
+    { label: "OpenRouter model", value: env.openRouterModel },
+    { label: "OpenRouter key", value: hasOpenRouter() ? "configured" : "missing", tone: hasOpenRouter() ? "ok" : "warn" },
+    { label: "OpenRouter vision", value: env.openRouterVision ? "enabled" : "off (images → Gemini)", tone: "default" },
+    { label: "Gemini fallback model", value: env.geminiModelPro },
+    { label: "Gemini key (fallback + vision)", value: hasGemini() ? "configured" : "missing", tone: hasGemini() ? "ok" : "warn" },
     { label: "Browser rendering (Playwright)", value: browser.available ? "available" : browser.reason ?? "unavailable", tone: browser.available ? "ok" : "warn" },
     { label: "Database", value: "SQLite (Prisma)", tone: "default" },
     { label: "Storage", value: env.storageDir, tone: "default" },

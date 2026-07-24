@@ -13,7 +13,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 004.6 15a2 2 0 010-4 1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1A1.7 1.7 0 0011.5 4.6a2 2 0 014 0 1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9 2 2 0 010 4z" },
 ];
 
-export function Sidebar({ aiLive }: { aiLive: boolean }) {
+export function Sidebar({ aiLive, label, sub }: { aiLive: boolean; label: string; sub: string }) {
   const pathname = usePathname();
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col p-3">
@@ -53,8 +53,8 @@ export function Sidebar({ aiLive }: { aiLive: boolean }) {
             <span className={cn("relative inline-flex h-2 w-2 rounded-full", aiLive ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]")} />
           </span>
           <div className="flex-1 text-xs">
-            <div className="font-medium text-fg">{aiLive ? "Gemini live" : "Dev fallback"}</div>
-            <div className="text-[10px] text-muted">{aiLive ? "Real AI analysis" : "No API key — mock AI"}</div>
+            <div className="font-medium text-fg">{label}</div>
+            <div className="text-[10px] text-muted">{sub}</div>
           </div>
           <ThemeToggle />
         </div>
