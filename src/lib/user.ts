@@ -1,33 +1,20 @@
-import { db } from "@/lib/db";
+import { ApiError } from "@/lib/api";
+import { getSessionUser } from "@/lib/auth/session";
 
-// MVP identity model: a single local workspace user, created lazily.
-// The data model is fully multi-user (every Project/Reference is scoped to a userId),
-// so real authentication (OAuth/password/session) can be layered on later without a
-// schema change. Full auth is an intentionally-deferred future feature.
-const DEFAULT_EMAIL = "you@forme.local";
+// Identity is now resolved from the server-side session (see src/lib/auth). Every
+// Project/Reference/Collection is scoped to a userId, so the whole app is multi-user
+// once currentUserId() returns the signed-in user. API routes are wrapped by handler(),
+// which turns the 401 ApiError below into a proper Unauthorized response; (app) pages
+// are additionally guarded by the (app) layout, which redirects to /login.
 
-let cachedId: string | null = null;
-
+/** The signed-in user, or null (used by the layout guard + auth pages). */
 export async function getCurrentUser() {
-  if (cachedId) {
-    const u = await db.user.findUnique({ where: { id: cachedId } });
-    if (u) return u;
-    cachedId = null;
-  }
-  const existing = await db.user.findUnique({ where: { email: DEFAULT_EMAIL } });
-  if (existing) {
-    cachedId = existing.id;
-    return existing;
-  }
-  const created = await db.user.create({ data: { email: DEFAULT_EMAIL, name: "You" } });
-  cachedId = created.id;
-  // Seed a few starter collections on first run.
-  await db.collection.createMany({
-    data: ["SaaS", "AI", "Portfolio", "Minimal", "Editorial", "Luxury"].map((name) => ({ name, userId: created.id })),
-  });
-  return created;
+  return getSessionUser();
 }
 
+/** The signed-in user's id. Throws 401 if there is no valid session. */
 export async function currentUserId(): Promise<string> {
-  return (await getCurrentUser()).id;
+  const user = await getSessionUser();
+  if (!user) throw new ApiError("You must be signed in.", 401);
+  return user.id;
 }

@@ -21,7 +21,7 @@ Built to solve the core failure of AI website builders: technically-working but 
 | **Feedback → PreferenceSignals** (design intelligence dataset foundation) | ✅ working |
 | Reference library, collections, project workspace | ✅ working |
 | **Redesign workflow** (original → proposed direction → redesigned, side by side) | ✅ working |
-| Auth (multi-user) | 🚧 single local user; data model is multi-user-ready |
+| **Auth (multi-user)** — email + password, server-side sessions, per-user data scoping | ✅ working |
 
 Every AI stage falls back to a **clearly-marked development provider** if the model errors or the free-tier quota is hit, so the app is never broken.
 
@@ -67,7 +67,9 @@ npm run dev
 ```
 
 ### First run
-Open **http://localhost:3000** → create a project → paste your idea → **Generate website**. It will produce a design direction, a design system, a real website, render it, and critique it. Use **Run improvement iteration** to evolve it; check **Versions** for history + scores.
+Open **http://localhost:3000** → **create an account** (email + password) → create a project → paste your idea → **Generate website**. It will produce a design direction, a design system, a real website, render it, and critique it. Use **Run improvement iteration** to evolve it; check **Versions** for history + scores.
+
+> The **first account you register claims any pre-auth workspace data**, so an existing single-user database migrates to your new account automatically. Every account after that gets its own isolated workspace. Sign out from the user menu at the bottom of the sidebar.
 
 Add references under **References** (URL or screenshot) to steer the design with real Design DNA.
 

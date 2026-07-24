@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui";
+
+type SidebarUser = { name: string | null; email: string };
 
 const nav = [
   { href: "/projects", label: "Projects", icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
@@ -69,7 +72,48 @@ function AiStatus({ aiLive }: { aiLive: boolean }) {
   );
 }
 
-export function Sidebar({ aiLive }: { aiLive: boolean }) {
+function UserFooter({ user }: { user: SidebarUser }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const initials = (user.name || user.email).trim().slice(0, 2).toUpperCase();
+
+  async function logout() {
+    setBusy(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignore — clear client state regardless */
+    }
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <div className="border-t p-3">
+      <div className="flex items-center gap-2.5 rounded-xl px-2 py-1.5">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold text-fg-dim">{initials}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium text-fg">{user.name || "Signed in"}</div>
+          <div className="truncate text-[11px] text-muted">{user.email}</div>
+        </div>
+        <button
+          type="button"
+          onClick={logout}
+          disabled={busy}
+          aria-label="Sign out"
+          title="Sign out"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-fg-dim transition hover:bg-surface-2 hover:text-fg disabled:opacity-50"
+        >
+          {busy ? <Spinner className="h-4 w-4" /> : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function Sidebar({ aiLive, user }: { aiLive: boolean; user: SidebarUser }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -129,6 +173,7 @@ export function Sidebar({ aiLive }: { aiLive: boolean }) {
         </div>
         <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
         <AiStatus aiLive={aiLive} />
+        <UserFooter user={user} />
       </aside>
     </>
   );

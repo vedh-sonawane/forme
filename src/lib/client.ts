@@ -15,6 +15,10 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const body = json as { ok?: boolean; data?: T; error?: string } | null;
   if (!res.ok || !body?.ok) {
+    // Session expired / not signed in → bounce to login (skip if already there).
+    if (res.status === 401 && typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
     throw new Error(body?.error || `Request failed (${res.status})`);
   }
   return body.data as T;

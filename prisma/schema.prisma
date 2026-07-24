@@ -15,17 +15,33 @@ datasource db {
 
 // ── Identity ──────────────────────────────────────────────────────────────
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String? // null = legacy anonymous local workspace (pre-auth), claimable on first register
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   projects    Project[]
   references  Reference[]
   collections Collection[]
   feedback    UserFeedback[]
   signals     PreferenceSignal[]
+  sessions    Session[]
+}
+
+// Server-side sessions (httpOnly cookie holds the opaque token).
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ── Workspace ─────────────────────────────────────────────────────────────
