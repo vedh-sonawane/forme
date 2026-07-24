@@ -39,10 +39,26 @@ type Content = {
   ctaSub: string;
 };
 
+const BRAND_STOP = new Set([
+  "a", "an", "the", "for", "of", "to", "and", "or", "with", "your", "our", "that", "this",
+  "site", "website", "landing", "page", "web", "app", "application", "platform", "startup",
+  "company", "business", "brand", "builds", "building", "make", "create", "new",
+]);
+
+function deriveBrand(product: string, business: string): string {
+  const fromProduct = product.trim();
+  if (fromProduct && !BRAND_STOP.has(fromProduct.toLowerCase())) {
+    return fromProduct.split(/[\s—-]/).filter(Boolean).slice(0, 2).join(" ").slice(0, 24);
+  }
+  const words = business.replace(/[^a-zA-Z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const significant = words.filter((w) => !BRAND_STOP.has(w.toLowerCase()));
+  const chosen = (significant.length ? significant : words).slice(0, 2).map((w) => w[0].toUpperCase() + w.slice(1));
+  return (chosen.join(" ") || "Forme").slice(0, 24);
+}
+
 function buildContent(req: Requirements, dir: DesignDirection): Content {
   const business = req.business?.trim() || "your product";
-  const brand =
-    (req.product?.trim() || business).split(/[\s—-]/).slice(0, 2).join(" ").slice(0, 22) || "Forme";
+  const brand = deriveBrand(req.product ?? "", business);
   const audience = req.target_audience || "modern teams";
   const goals = req.goals?.length ? req.goals : ["move faster", "look world-class", "convert more"];
   const nav = (req.pages?.length ? req.pages : ["Features", "Showcase", "Pricing"]).filter((p) => !/home/i.test(p)).slice(0, 4);
@@ -65,7 +81,7 @@ function buildContent(req: Requirements, dir: DesignDirection): Content {
     brand,
     navItems: nav,
     heroEyebrow: (req.industry || dir.design_personality?.[0] || "Introducing").toString(),
-    heroTitle: capitalizeSmart(business),
+    heroTitle: headline(business),
     heroSub:
       dir.visual_concept?.slice(0, 160) ||
       `A ${dir.design_personality?.[0] ?? "modern"} experience built for ${audience}. Designed to ${goals[0] ?? "convert"}.`,
@@ -94,6 +110,15 @@ function buildContent(req: Requirements, dir: DesignDirection): Content {
 function capitalizeSmart(s: string) {
   const t = s.trim().replace(/\.$/, "");
   return t.length > 78 ? t.slice(0, 78) + "…" : t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+// Turn a business description into a hero-worthy headline: keep the first sentence,
+// drop a leading "A/An … site/page/app for" preamble, and capitalize.
+function headline(business: string) {
+  let t = business.trim().split(/(?<=[.!?])\s+/)[0] || business.trim();
+  t = t.replace(/^(?:an?|the)\s+[\w-]*\s*(?:site|website|web ?site|page|app|application|platform)\s+(?:for|to|that)\s+/i, "");
+  t = t.replace(/^(?:an?|the)\s+/i, "");
+  return capitalizeSmart(t);
 }
 
 function navSection(c: Content) {
