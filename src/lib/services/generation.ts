@@ -9,7 +9,7 @@ import {
   synthesizeDNA,
   critiqueWebsite,
 } from "@/lib/agents";
-import { generateWebsiteCode, improveWebsiteCode } from "@/lib/agents/code";
+import { generateWebsiteCode, improveWebsiteCode, editWebsiteCode } from "@/lib/agents/code";
 import { toJSON, parseJSON } from "@/lib/utils";
 import {
   DesignDNASchema,
@@ -300,4 +300,57 @@ export async function improveWebsite(websiteId: string) {
   }
 
   return { versionId: newVersion.id, scoreBefore, scoreAfter, accepted, regression, changeNote: improved.changeNote };
+}
+
+// ── Edit: apply a natural-language instruction to the current version ──────────────
+// Continuous, user-driven editing (AI Editor). Reuses versioning + render + critique.
+// The edit always becomes the current version; a failed/no-op edit keeps the HTML intact.
+export async function editWebsite(websiteId: string, instruction: string) {
+  const trimmed = instruction.trim();
+  if (!trimmed) throw new Error("Describe the change you want.");
+
+  const site = await db.generatedWebsite.findUniqueOrThrow({
+    where: { id: websiteId },
+    include: {
+      project: true,
+      versions: { orderBy: { version: "desc" }, take: 1 },
+      direction: { include: { designSystems: { orderBy: { createdAt: "desc" }, take: 1 } } },
+    },
+  });
+  const current = site.versions[0];
+  if (!current) throw new Error("Generate a website before editing it.");
+
+  const project = site.project;
+  const requirements = await ensureRequirements(project);
+  const direction = site.direction ? DesignDirectionSchema.parse(parseJSON(site.direction.direction, {})) : DesignDirectionSchema.parse({});
+  const sysRow = site.direction?.designSystems?.[0];
+  const system = sysRow ? DesignSystemSchema.parse(parseJSON(sysRow.tokens, {})) : DesignSystemSchema.parse({});
+
+  const edited = await editWebsiteCode({ html: current.html, instruction: trimmed, system });
+  const changed = edited.html !== current.html;
+
+  const nextVersionNum = current.version + 1;
+  const newVersion = await db.websiteVersion.create({
+    data: {
+      websiteId: site.id,
+      version: nextVersionNum,
+      label: `edit v${nextVersionNum}`,
+      html: edited.html,
+      parentVersionId: current.id,
+      changeNote: `Edit: “${trimmed.slice(0, 160)}”`,
+    },
+  });
+  await saveText(`sites/html`, `${site.id}-v${nextVersionNum}.html`, edited.html);
+
+  const result = await renderAndCritique(newVersion.id, edited.html, { requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) });
+
+  // A user-requested edit always becomes the current version.
+  await db.generatedWebsite.update({ where: { id: site.id }, data: { currentVersionId: newVersion.id } });
+
+  // Record the edit for the design-intelligence dataset (best-effort).
+  await db.userFeedback
+    .create({ data: { userId: project.userId, projectId: project.id, targetType: "website", targetId: site.id, action: "edit", value: toJSON({ instruction: trimmed, versionId: newVersion.id }) } })
+    .catch(() => {});
+
+  return { versionId: newVersion.id, score: result.score, changed, usedFallback: edited.usedFallback };
 }

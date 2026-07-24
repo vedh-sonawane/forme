@@ -84,6 +84,38 @@ export async function generateWebsiteCode(input: {
   return { html: baseline, meta: res.meta, usedFallback: true, source: "baseline" };
 }
 
+// ── Editor Agent ────────────────────────────────────────────────────────────────
+// Instruction-driven in-place edit of an existing generated site. On any failure it
+// returns the ORIGINAL html unchanged, so a bad edit can never break the site.
+export async function editWebsiteCode(input: {
+  html: string;
+  instruction: string;
+  system: DesignSystem;
+}): Promise<CodeGenResult> {
+  if (!usingRealAI()) {
+    return {
+      html: input.html,
+      meta: { provider: "mock", model: "mock", operation: "website-edit", promptVersion: "website-edit-v1", inputType: "text", latencyMs: 0, ok: true },
+      usedFallback: true,
+      source: "baseline",
+    };
+  }
+  const css = systemToCss(input.system);
+  const p = prompts["website-edit-v1"];
+  const res = await generateRaw({
+    operation: p.operation,
+    promptVersion: "website-edit-v1",
+    model: "pro",
+    maxOutputTokens: 32000,
+    temperature: 0.4,
+    ...p.build({ html: input.html, instruction: input.instruction, systemCss: css }),
+  });
+  const html = res.meta.ok ? extractHtml(res.text) : null;
+  if (html) return { html: injectFailsafe(html), meta: res.meta, usedFallback: res.usedFallback, source: "llm" };
+  // Malformed/failed edit → keep the current document exactly as-is.
+  return { html: input.html, meta: res.meta, usedFallback: true, source: "baseline" };
+}
+
 // ── Improvement Agent ─────────────────────────────────────────────────────────────
 // Deterministic token nudge used when there's no real AI (or as a safety net):
 // translate critique issue categories into concrete design-system adjustments.

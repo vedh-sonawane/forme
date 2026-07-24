@@ -52,6 +52,7 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
   const genWebsite = () => run("generate", () => api(`/api/projects/${p.id}/generate`, { method: "POST" }), "Website generated & critiqued");
   const redesign = () => run("redesign", () => api(`/api/projects/${p.id}/redesign`, { method: "POST" }), "Redesign generated & critiqued");
   const improve = () => latestSite && run("improve", () => api(`/api/websites/${latestSite.id}/improve`, { method: "POST" }), "Improvement iteration complete");
+  const edit = (instruction: string) => latestSite && run("edit", () => api(`/api/websites/${latestSite.id}/edit`, { method: "POST", body: JSON.stringify({ instruction }) }), "Edit applied");
   const approve = () => latestDirection && run("approve", () => api(`/api/directions/${latestDirection.id}/approve`, { method: "POST", body: JSON.stringify({ approved: true }) }), "Direction approved");
   const feedback = (action: string, targetType: string, targetId: string) =>
     run("fb", () => api(`/api/feedback`, { method: "POST", body: JSON.stringify({ projectId: p.id, action, targetType, targetId, category: p.requirements.industry }) }), "Feedback recorded");
@@ -79,13 +80,14 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         </div>
       </div>
 
-      {(busy === "generate" || busy === "direction" || busy === "improve" || busy === "redesign") && (
+      {(busy === "generate" || busy === "direction" || busy === "improve" || busy === "redesign" || busy === "edit") && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
           <Spinner className="h-4 w-4 text-[color:var(--accent)]" />
           <span className="text-fg-dim">
             {busy === "direction" && "Analyzing requirements → synthesizing references → composing design direction & system…"}
             {busy === "generate" && "Direction → design system → architecture → code generation → browser render → visual critique. This can take 30–90s."}
             {busy === "improve" && "Applying critique fixes → re-rendering → re-critiquing → checking for regressions…"}
+            {busy === "edit" && "Applying your edit in place → re-rendering → re-critiquing…"}
             {busy === "redesign" && "Analyzing the original → preserving brand & content → composing an improved direction → generating & critiquing the redesign…"}
           </span>
         </div>
@@ -208,6 +210,7 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
           setSelectedVersionId={setSelectedVersionId}
           onGenerate={genWebsite}
           onImprove={improve}
+          onEdit={edit}
           onFeedback={feedback}
           busy={busy}
         />
@@ -263,17 +266,29 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
 }
 
 // ── Build tab (extracted for clarity) ─────────────────────────────────────────────
+const EDIT_PRESETS = [
+  "Make it feel more premium",
+  "Change the palette to emerald green",
+  "Add a pricing section",
+  "Make the navigation sticky",
+  "Add a dark mode toggle",
+  "Tighten mobile spacing",
+  "Use larger, bolder typography",
+];
+
 function BuildTab({
-  site, selectedVersionId, setSelectedVersionId, onGenerate, onImprove, onFeedback, busy,
+  site, selectedVersionId, setSelectedVersionId, onGenerate, onImprove, onEdit, onFeedback, busy,
 }: {
   site: SerializedProject["sites"][number] | null;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string) => void;
   onGenerate: () => void;
   onImprove: () => void;
+  onEdit: (instruction: string) => void;
   onFeedback: (action: string, targetType: string, targetId: string) => void;
   busy: string | null;
 }) {
+  const [instruction, setInstruction] = useState("");
   if (!site || site.versions.length === 0) {
     return (
       <EmptyState
@@ -299,6 +314,29 @@ function BuildTab({
       </div>
 
       <div className="space-y-4">
+        <div className="card p-5">
+          <div className="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[color:var(--accent)]"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z" /></svg>
+            <h3 className="text-sm font-semibold">AI Editor</h3>
+          </div>
+          <p className="mt-1 text-xs text-fg-dim">Describe a change in plain English — it edits this version in place and saves a new version.</p>
+          <textarea
+            className="input mt-3 min-h-[78px] resize-y"
+            placeholder="e.g. Make the hero more premium and switch the palette to emerald green"
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            disabled={!!busy}
+          />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {EDIT_PRESETS.map((preset) => (
+              <button key={preset} type="button" className="chip" disabled={!!busy} onClick={() => setInstruction(preset)}>{preset}</button>
+            ))}
+          </div>
+          <button className="btn-primary mt-3 w-full" disabled={!!busy || !instruction.trim()} onClick={() => onEdit(instruction.trim())}>
+            {busy === "edit" ? <Spinner className="h-4 w-4" /> : null}{busy === "edit" ? "Applying…" : "Apply edit"}
+          </button>
+        </div>
+
         <div className="card p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Improvement loop</h3>

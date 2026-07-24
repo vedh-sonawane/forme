@@ -265,6 +265,23 @@ Return the FULL improved HTML document with the fixes applied.`,
     }),
   },
 
+  "website-edit-v1": {
+    operation: "website-edit",
+    build: (input: { html: string; instruction: string; systemCss: string }): BuiltPrompt => ({
+      system: `You are a senior frontend engineer editing an EXISTING generated website IN PLACE, following the
+user's natural-language instruction. Make ONLY the change requested and PRESERVE everything else exactly —
+content, copy, section order, structure, links, scripts, and anything not mentioned. Keep it ONE valid,
+self-contained, responsive HTML document; never restart from a template or drop sections. For a global change
+(palette, spacing, typography, add dark mode, sticky nav, glassmorphism, etc.) apply it consistently using the
+existing CSS variables/classes. Write real content for any NEW section the user asks to add (no lorem ipsum).
+Return the FULL updated HTML document only — no markdown, no commentary.`,
+      user: `User edit request:\n"""${input.instruction}"""\n
+Design tokens already present in the document (CSS variables + helper classes):\n<style>${input.systemCss}</style>\n
+Current HTML (edit this in place — return the whole document):\n${input.html}\n
+Apply ONLY the requested change and return the FULL updated HTML document.`,
+    }),
+  },
+
   "quality-eval-v1": {
     operation: "quality-eval",
     build: (input: { requirements?: string; dnaJson?: string }): BuiltPrompt => ({
