@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/user";
 import { DnaViewer } from "@/components/DnaViewer";
+import { ReferenceMeta } from "@/components/ReferenceMeta";
 import { Badge } from "@/components/ui";
 import { parseJSON } from "@/lib/utils";
 import { DesignDNASchema } from "@/lib/design/schema";
@@ -12,10 +13,17 @@ export const dynamic = "force-dynamic";
 export default async function ReferenceDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await currentUserId();
-  const reference = await db.reference.findFirst({
-    where: { id, userId },
-    include: { websiteAnalysis: true, dnaProfiles: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
+  const [reference, collections] = await Promise.all([
+    db.reference.findFirst({
+      where: { id, userId },
+      include: {
+        websiteAnalysis: true,
+        dnaProfiles: { orderBy: { createdAt: "desc" }, take: 1 },
+        collections: { select: { collectionId: true } },
+      },
+    }),
+    db.collection.findMany({ where: { userId }, include: { _count: { select: { references: true } } }, orderBy: { name: "asc" } }),
+  ]);
   if (!reference) notFound();
 
   const dnaRow = reference.dnaProfiles[0];
@@ -46,7 +54,7 @@ export default async function ReferenceDetail({ params }: { params: Promise<{ id
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           <div className="card overflow-hidden p-0">
             {shot ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -56,8 +64,15 @@ export default async function ReferenceDetail({ params }: { params: Promise<{ id
             )}
           </div>
           {reference.websiteAnalysis?.status === "error" && (
-            <p className="mt-2 text-xs text-[color:var(--danger)]">Capture note: {reference.websiteAnalysis.error}</p>
+            <p className="text-xs text-[color:var(--danger)]">Capture note: {reference.websiteAnalysis.error}</p>
           )}
+          <ReferenceMeta
+            referenceId={reference.id}
+            initialTags={parseJSON<string[]>(reference.tags, [])}
+            initialNotes={reference.notes ?? ""}
+            collections={collections.map((c) => ({ id: c.id, name: c.name, count: c._count.references }))}
+            memberIds={reference.collections.map((c) => c.collectionId)}
+          />
         </div>
 
         <div>

@@ -11,12 +11,13 @@ import { cn } from "@/lib/utils";
 import { DirectionView, SystemPreview, CritiqueView } from "./Viewers";
 import { PreviewFrame } from "./PreviewFrame";
 
-type Tab = "overview" | "references" | "direction" | "build" | "versions";
+type Tab = "overview" | "references" | "direction" | "build" | "redesign" | "versions";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "references", label: "References" },
   { id: "direction", label: "Design Direction" },
   { id: "build", label: "Build & Critique" },
+  { id: "redesign", label: "Redesign" },
   { id: "versions", label: "Versions" },
 ];
 
@@ -49,6 +50,7 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
 
   const genDirection = () => run("direction", () => api(`/api/projects/${p.id}/direction`, { method: "POST" }), "Design direction generated");
   const genWebsite = () => run("generate", () => api(`/api/projects/${p.id}/generate`, { method: "POST" }), "Website generated & critiqued");
+  const redesign = () => run("redesign", () => api(`/api/projects/${p.id}/redesign`, { method: "POST" }), "Redesign generated & critiqued");
   const improve = () => latestSite && run("improve", () => api(`/api/websites/${latestSite.id}/improve`, { method: "POST" }), "Improvement iteration complete");
   const approve = () => latestDirection && run("approve", () => api(`/api/directions/${latestDirection.id}/approve`, { method: "POST", body: JSON.stringify({ approved: true }) }), "Direction approved");
   const feedback = (action: string, targetType: string, targetId: string) =>
@@ -77,13 +79,14 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         </div>
       </div>
 
-      {(busy === "generate" || busy === "direction" || busy === "improve") && (
+      {(busy === "generate" || busy === "direction" || busy === "improve" || busy === "redesign") && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
           <Spinner className="h-4 w-4 text-[color:var(--accent)]" />
           <span className="text-fg-dim">
             {busy === "direction" && "Analyzing requirements → synthesizing references → composing design direction & system…"}
             {busy === "generate" && "Direction → design system → architecture → code generation → browser render → visual critique. This can take 30–90s."}
             {busy === "improve" && "Applying critique fixes → re-rendering → re-critiquing → checking for regressions…"}
+            {busy === "redesign" && "Analyzing the original → preserving brand & content → composing an improved direction → generating & critiquing the redesign…"}
           </span>
         </div>
       )}
@@ -210,6 +213,20 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         />
       )}
 
+      {/* REDESIGN */}
+      {tab === "redesign" && (
+        <RedesignTab
+          projectId={p.id}
+          target={p.references.find((r) => r.role === "redesign-target") ?? null}
+          site={p.sites.find((s) => s.kind === "redesign") ?? null}
+          directions={p.directions}
+          onRedesign={redesign}
+          onFeedback={feedback}
+          onRefresh={() => router.refresh()}
+          busy={busy}
+        />
+      )}
+
       {/* VERSIONS */}
       {tab === "versions" && (
         <div>
@@ -299,6 +316,125 @@ function BuildTab({
 
         {selected.critique ? <CritiqueView critique={selected.critique} /> : <div className="card p-5 text-sm text-muted">No critique for this version.</div>}
       </div>
+    </div>
+  );
+}
+
+// ── Redesign tab: original → proposed direction → redesigned, side by side ─────────
+function RedesignTab({
+  projectId, target, site, directions, onRedesign, onFeedback, onRefresh, busy,
+}: {
+  projectId: string;
+  target: SerializedProject["references"][number] | null;
+  site: SerializedProject["sites"][number] | null;
+  directions: SerializedProject["directions"];
+  onRedesign: () => void;
+  onFeedback: (action: string, targetType: string, targetId: string) => void;
+  onRefresh: () => void;
+  busy: string | null;
+}) {
+  const version = site?.versions.find((v) => v.id === site.currentVersionId) ?? site?.versions[0] ?? null;
+  const direction = site ? directions.find((d) => d.id === site.directionId)?.direction ?? null : null;
+
+  if (!target) {
+    return (
+      <div>
+        <div className="mb-5 max-w-2xl">
+          <h3 className="text-base font-semibold">Redesign an existing website</h3>
+          <p className="mt-1 text-sm text-fg-dim">
+            Add the current design as a <span className="font-medium text-fg">redesign target</span> — a live URL or a screenshot.
+            FORME analyzes its weaknesses, then generates an improved version that <span className="font-medium text-fg">preserves the brand, content, and purpose</span>.
+          </p>
+        </div>
+        <AddReference projectId={projectId} redesign onDone={onRefresh} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Badge tone="accent">redesign target</Badge>
+          <span className="text-sm font-medium">{target.title || target.sourceUrl || "Original design"}</span>
+        </div>
+        <div className="flex gap-2">
+          <button className="btn-primary" onClick={onRedesign} disabled={!!busy || !target.hasDna}>
+            {busy === "redesign" ? <Spinner className="h-4 w-4" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6M3 22v-6h6M3 12a9 9 0 0 1 15-6.7L21 8M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>}
+            {busy === "redesign" ? "Redesigning…" : site ? "Regenerate redesign" : "Generate redesign"}
+          </button>
+        </div>
+      </div>
+      {!target.hasDna && <div className="mb-4 rounded-xl border border-[color:var(--warn)]/30 bg-[color:var(--warn)]/10 px-4 py-2.5 text-sm text-[color:var(--warn)]">The target is still being analyzed — its Design DNA must finish before redesigning.</div>}
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {/* ORIGINAL */}
+        <div className="card p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold">Original</h4>
+            {target.dnaStyle && <span className="text-[11px] text-muted">{target.dnaStyle}</span>}
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-surface-2">
+            {target.thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={target.thumb} alt="original" className="max-h-[420px] w-full object-cover object-top" />
+            ) : <div className="grid aspect-video place-items-center text-xs text-muted">no capture</div>}
+          </div>
+          {target.dnaWeaknesses.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[color:var(--danger)]">Weaknesses to fix</div>
+              <ul className="space-y-1 text-xs text-fg-dim">{target.dnaWeaknesses.slice(0, 6).map((w, i) => <li key={i}>• {w}</li>)}</ul>
+            </div>
+          )}
+        </div>
+
+        {/* PROPOSED DIRECTION */}
+        <div className="card p-4">
+          <h4 className="mb-2 text-sm font-semibold">Proposed direction</h4>
+          {direction ? (
+            <div className="space-y-2.5 text-sm">
+              <p className="text-fg-dim">{direction.visual_concept}</p>
+              <div className="flex flex-wrap gap-1.5">{(direction.design_personality ?? []).map((m) => <Badge key={m} tone="accent">{m}</Badge>)}</div>
+              {[["Typography", direction.typography_direction], ["Color", direction.color_direction], ["Layout", direction.layout_direction], ["Components", direction.component_direction]].map(([label, val]) =>
+                val ? <div key={label as string}><div className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</div><div className="mt-0.5 text-xs text-fg">{val as string}</div></div> : null
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted">Generate the redesign to see the proposed direction — it preserves the brand while fixing the weaknesses.</p>
+          )}
+        </div>
+
+        {/* REDESIGNED */}
+        <div className="card p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold">Redesigned</h4>
+            {typeof version?.score === "number" && <div className="text-sm font-bold" style={{ color: scoreColor(version.score) }}>{Math.round(version.score)}</div>}
+          </div>
+          {version ? (
+            <>
+              <div className="overflow-hidden rounded-lg border bg-surface-2">
+                {version.screenshotUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={version.screenshotUrl} alt="redesigned" className="max-h-[420px] w-full object-cover object-top" />
+                ) : <div className="grid aspect-video place-items-center text-xs text-muted">rendering unavailable</div>}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a href={`/api/versions/${version.id}/preview`} target="_blank" rel="noopener noreferrer" className="btn-subtle">Open live ↗</a>
+                <button className="btn-ghost" onClick={() => onFeedback("accept", "website", site!.id)} disabled={!!busy}>👍 Keep</button>
+                <button className="btn-ghost" onClick={() => onFeedback("reject", "website", site!.id)} disabled={!!busy}>👎 Discard</button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted">No redesign yet. Click “Generate redesign”.</p>
+          )}
+        </div>
+      </div>
+
+      {version && (
+        <div className="mt-4">
+          <PreviewFrame versionId={version.id} />
+        </div>
+      )}
     </div>
   );
 }

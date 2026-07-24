@@ -84,6 +84,7 @@ export async function runScreenshotAnalysis(input: {
   title?: string;
   userId: string;
   projectId?: string;
+  role?: string;
 }): Promise<AnalysisResult> {
   if (input.files.length === 0) throw new Error("No files provided.");
 
@@ -110,7 +111,7 @@ export async function runScreenshotAnalysis(input: {
   }
 
   if (input.projectId) {
-    await db.projectReference.create({ data: { projectId: input.projectId, referenceId: reference.id, role: "inspiration" } }).catch(() => {});
+    await db.projectReference.create({ data: { projectId: input.projectId, referenceId: reference.id, role: input.role || "inspiration" } }).catch(() => {});
   }
 
   const dna = await analyzeScreenshots({ device: input.device, note: input.note, count: images.length }, images);

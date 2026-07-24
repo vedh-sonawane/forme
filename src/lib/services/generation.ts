@@ -151,6 +151,75 @@ export async function generateProjectWebsite(projectId: string, directionId?: st
   return { websiteId: site.id, versionId: version.id, score: result.score, usedFallback: code.usedFallback };
 }
 
+// ── Redesign: preserve brand/content/purpose, fix the original's weaknesses ────────
+export async function redesignProjectWebsite(projectId: string) {
+  const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+
+  // Find the redesign target (the existing site the user wants improved).
+  const targetLink = await db.projectReference.findFirst({
+    where: { projectId, role: "redesign-target" },
+    orderBy: { createdAt: "desc" },
+    include: { reference: { include: { dnaProfiles: { orderBy: { createdAt: "desc" }, take: 1 }, websiteAnalysis: true } } },
+  });
+  if (!targetLink) throw new Error("Attach a redesign target first (a website URL or screenshot of the existing design).");
+
+  const target = targetLink.reference;
+  const dnaRow = target.dnaProfiles[0];
+  if (!dnaRow) throw new Error("The redesign target hasn't finished analysis yet. Try again in a moment.");
+  const targetDNA = DesignDNASchema.parse(parseJSON(dnaRow.profile, {}));
+
+  await db.project.update({ where: { id: projectId }, data: { status: "researching" } });
+
+  // Base requirements, then augment with redesign constraints derived from the original.
+  const base = await ensureRequirements(project);
+  const weaknesses = (targetDNA.weaknesses ?? []).slice(0, 8);
+  const originalPalette = (targetDNA.color?.palette ?? []).map((c) => c.hex).filter(Boolean);
+  const requirements: Requirements = {
+    ...base,
+    industry: base.industry || targetDNA.style?.industry || "",
+    target_audience: base.target_audience || targetDNA.style?.target_audience || "",
+    brand_colors: base.brand_colors.length ? base.brand_colors : originalPalette,
+    must_include: Array.from(new Set([...base.must_include, "Preserve the original brand identity, core content, and business purpose"])),
+    constraints: Array.from(new Set([
+      ...base.constraints,
+      "This is a REDESIGN: keep what works, do not invent a new brand",
+      ...weaknesses.map((w) => `Fix weakness of the original: ${w}`),
+    ])),
+  };
+
+  // Direction is built from the ORIGINAL's DNA so the redesign stays recognizably on-brand.
+  const dir = await generateDirection(requirements, targetDNA);
+  const sys = await generateDesignSystem(dir.data, requirements.brand_colors);
+
+  const lastDir = await db.designDirection.findFirst({ where: { projectId }, orderBy: { version: "desc" } });
+  const version = (lastDir?.version ?? 0) + 1;
+  const direction = await db.designDirection.create({
+    data: { projectId, version, direction: toJSON(dir.data), summary: dir.data.visual_concept, modelMeta: toJSON(dir.meta) },
+  });
+  await db.designSystem.create({ data: { projectId, directionId: direction.id, tokens: toJSON(sys.data), modelMeta: toJSON(sys.meta) } });
+
+  await db.project.update({ where: { id: projectId }, data: { status: "generating" } });
+
+  const plan = await planWebsite(requirements, dir.data);
+  const code = await generateWebsiteCode({ requirements, direction: dir.data, system: sys.data, plan: WebsitePlanSchema.parse(plan.data) });
+
+  const site = await db.generatedWebsite.create({
+    data: { projectId, directionId: direction.id, kind: "redesign", title: `${target.title || project.name} — redesign`, status: "rendered" },
+  });
+  await saveText(`sites/html`, `${site.id}-v1.html`, code.html);
+  const newVersion = await db.websiteVersion.create({
+    data: { websiteId: site.id, version: 1, label: "redesign v1", html: code.html, changeNote: "Redesign preserving brand & content while fixing the original's weaknesses." },
+  });
+
+  await db.project.update({ where: { id: projectId }, data: { status: "critiquing" } });
+  const result = await renderAndCritique(newVersion.id, code.html, { requirements: JSON.stringify(requirements), directionJson: JSON.stringify(dir.data) });
+
+  await db.generatedWebsite.update({ where: { id: site.id }, data: { currentVersionId: newVersion.id, status: "critiqued" } });
+  await db.project.update({ where: { id: projectId }, data: { status: "ready" } });
+
+  return { websiteId: site.id, versionId: newVersion.id, directionId: direction.id, score: result.score, usedFallback: code.usedFallback || dir.usedFallback };
+}
+
 // ── Improve: one critique-driven iteration with regression detection ──────────────
 export async function improveWebsite(websiteId: string) {
   const site = await db.generatedWebsite.findUniqueOrThrow({

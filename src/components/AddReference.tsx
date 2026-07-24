@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 type Tab = "url" | "upload";
 
-export function AddReference({ projectId, onDone }: { projectId?: string; onDone?: () => void }) {
+export function AddReference({ projectId, onDone, redesign }: { projectId?: string; onDone?: () => void; redesign?: boolean }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("url");
   const [url, setUrl] = useState("");
@@ -34,7 +34,7 @@ export function AddReference({ projectId, onDone }: { projectId?: string; onDone
     setError(null);
     setStage("Rendering page & extracting Design DNA… this can take ~15–40s");
     try {
-      await api("/api/analyze/url", { method: "POST", body: JSON.stringify({ url, projectId }) });
+      await api("/api/analyze/url", { method: "POST", body: JSON.stringify({ url, projectId, redesign }) });
       reset();
       onDone?.();
       router.refresh();
@@ -57,6 +57,7 @@ export function AddReference({ projectId, onDone }: { projectId?: string; onDone
       fd.append("device", device);
       if (note) fd.append("note", note);
       if (projectId) fd.append("projectId", projectId);
+      if (redesign) fd.append("role", "redesign-target");
       const res = await fetch("/api/analyze/screenshot", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Upload failed");

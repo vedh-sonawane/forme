@@ -1,17 +1,48 @@
 import { db } from "@/lib/db";
 import { currentUserId } from "@/lib/user";
 import { AddReference } from "@/components/AddReference";
-import { ReferenceCard } from "@/components/ReferenceCard";
-import { EmptyState } from "@/components/ui";
+import { ReferenceBrowser, type BrowserRef } from "@/components/ReferenceBrowser";
+import { parseJSON } from "@/lib/utils";
+import { DesignDNASchema } from "@/lib/design/schema";
 
 export const dynamic = "force-dynamic";
 
+const fileUrl = (rel: string | null | undefined) => (rel ? `/api/files/${rel}` : null);
+
 export default async function ReferencesPage() {
   const userId = await currentUserId();
-  const references = await db.reference.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    include: { websiteAnalysis: true, dnaProfiles: { take: 1, orderBy: { createdAt: "desc" } } },
+  const [references, collections] = await Promise.all([
+    db.reference.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        websiteAnalysis: true,
+        dnaProfiles: { take: 1, orderBy: { createdAt: "desc" } },
+        collections: { select: { collectionId: true } },
+      },
+    }),
+    db.collection.findMany({ where: { userId }, include: { _count: { select: { references: true } } }, orderBy: { name: "asc" } }),
+  ]);
+
+  const serialized: BrowserRef[] = references.map((r) => {
+    const dnaRow = r.dnaProfiles[0];
+    const style = dnaRow ? DesignDNASchema.parse(parseJSON(dnaRow.profile, {})).style?.primary_style || null : null;
+    const thumb =
+      r.kind === "screenshot"
+        ? fileUrl(r.filePath)
+        : fileUrl(r.websiteAnalysis?.fullScreenshot) ?? fileUrl(parseJSON<string[]>(r.websiteAnalysis?.viewportShots, [])[0]);
+    return {
+      id: r.id,
+      kind: r.kind,
+      title: r.title,
+      sourceUrl: r.sourceUrl,
+      thumb,
+      hasDna: r.dnaProfiles.length > 0,
+      style,
+      tags: parseJSON<string[]>(r.tags, []),
+      collectionIds: r.collections.map((c) => c.collectionId),
+      createdAt: r.createdAt.toISOString(),
+    };
   });
 
   return (
@@ -26,15 +57,10 @@ export default async function ReferencesPage() {
       <AddReference />
 
       <div className="mt-8">
-        {references.length === 0 ? (
-          <EmptyState title="No references yet" desc="Add a website URL or upload screenshots above to extract Design DNA." />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {references.map((r: any) => (
-              <ReferenceCard key={r.id} reference={r} hasDna={r.dnaProfiles.length > 0} />
-            ))}
-          </div>
-        )}
+        <ReferenceBrowser
+          references={serialized}
+          collections={collections.map((c) => ({ id: c.id, name: c.name, count: c._count.references }))}
+        />
       </div>
     </div>
   );

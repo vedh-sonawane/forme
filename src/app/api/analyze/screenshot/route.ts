@@ -15,6 +15,7 @@ export const POST = handler(async (req: Request) => {
   const note = (form.get("note") as string) || undefined;
   const title = (form.get("title") as string) || undefined;
   const projectId = (form.get("projectId") as string) || undefined;
+  const role = (form.get("role") as string) || undefined;
 
   const fileEntries = form.getAll("files").filter((f): f is File => f instanceof File);
   if (fileEntries.length === 0) return fail("Upload at least one screenshot.");
@@ -27,6 +28,6 @@ export const POST = handler(async (req: Request) => {
     files.push({ buffer, mime: f.type, name: f.name });
   }
 
-  const result = await runScreenshotAnalysis({ files, device, note, title, userId, projectId });
+  const result = await runScreenshotAnalysis({ files, device, note, title, userId, projectId, role });
   return ok(result, { status: 201 });
 });

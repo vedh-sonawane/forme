@@ -13,6 +13,7 @@ export function serializeProject(p: any) {
   const references = ((p.references ?? []) as any[]).map((pr: any) => {
     const r = pr.reference;
     const dnaRow = r.dnaProfiles?.[0];
+    const dna = dnaRow ? DesignDNASchema.parse(parseJSON(dnaRow.profile, {})) : null;
     const thumb =
       r.kind === "screenshot"
         ? fileUrl(r.filePath)
@@ -26,6 +27,9 @@ export function serializeProject(p: any) {
       thumb,
       hasDna: !!dnaRow,
       dnaSummary: dnaRow?.summary ?? null,
+      dnaWeaknesses: dna?.weaknesses ?? [],
+      dnaStrengths: dna?.strengths ?? [],
+      dnaStyle: dna?.style?.primary_style ?? null,
     };
   });
 
@@ -47,6 +51,7 @@ export function serializeProject(p: any) {
     kind: s.kind,
     status: s.status,
     title: s.title,
+    directionId: s.directionId ?? null,
     currentVersionId: s.currentVersionId,
     versions: ((s.versions ?? []) as any[]).map((v: any) => {
       const crit = v.critiques?.[0];
