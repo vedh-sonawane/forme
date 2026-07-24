@@ -1,6 +1,6 @@
 import { Card, Badge } from "@/components/ui";
 import { usingRealAI } from "@/lib/ai/provider";
-import { env, resolveProvider, hasOpenRouter, hasGemini } from "@/lib/env";
+import { env, resolveProvider, hasOpenRouter, hasGroq, hasCerebras, hasGithubModels, hasGemini } from "@/lib/env";
 import { browserAvailable } from "@/lib/render/browser";
 import { db } from "@/lib/db";
 
@@ -16,13 +16,18 @@ export default async function SettingsPage() {
     db.reference.count(),
   ]);
 
+  const okwarn = (ok: boolean) => (ok ? ("ok" as const) : ("warn" as const));
+  const providers: { label: string; value: string; tone: "ok" | "warn" }[] = [
+    { label: "OpenRouter", value: hasOpenRouter() ? env.openRouterModels.join(", ") : "no key", tone: okwarn(hasOpenRouter()) },
+    { label: "Groq", value: hasGroq() ? env.groqModel : "no key", tone: okwarn(hasGroq()) },
+    { label: "Cerebras", value: hasCerebras() ? env.cerebrasModel : "no key", tone: okwarn(hasCerebras()) },
+    { label: "GitHub Models", value: hasGithubModels() ? env.githubModel : "no key", tone: okwarn(hasGithubModels()) },
+    { label: "Gemini (vision)", value: hasGemini() ? env.geminiModelPro : "no key", tone: okwarn(hasGemini()) },
+  ];
+
   const rows: { label: string; value: string; tone?: "ok" | "warn" | "default" | "accent" }[] = [
-    { label: "Active provider (primary)", value: provider, tone: aiLive ? "ok" : "warn" },
-    { label: "OpenRouter model", value: env.openRouterModel },
-    { label: "OpenRouter key", value: hasOpenRouter() ? "configured" : "missing", tone: hasOpenRouter() ? "ok" : "warn" },
-    { label: "OpenRouter vision", value: env.openRouterVision ? "enabled" : "off (images → Gemini)", tone: "default" },
-    { label: "Gemini fallback model", value: env.geminiModelPro },
-    { label: "Gemini key (fallback + vision)", value: hasGemini() ? "configured" : "missing", tone: hasGemini() ? "ok" : "warn" },
+    { label: "Active pool (primary)", value: provider, tone: aiLive ? "ok" : "warn" },
+    { label: "Call throttle", value: `${env.aiMinGapMs}ms min gap`, tone: "default" },
     { label: "Browser rendering (Playwright)", value: browser.available ? "available" : browser.reason ?? "unavailable", tone: browser.available ? "ok" : "warn" },
     { label: "Database", value: "SQLite (Prisma)", tone: "default" },
     { label: "Storage", value: env.storageDir, tone: "default" },
@@ -40,6 +45,22 @@ export default async function SettingsPage() {
             <div key={r.label} className="flex items-center justify-between py-3 text-sm">
               <span className="text-fg-dim">{r.label}</span>
               <Badge tone={r.tone ?? "default"}>{r.value}</Badge>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-fg-dim">Provider pool</h2>
+        <p className="mb-4 text-xs text-muted">Text calls rotate across every configured provider; on a rate-limit they fall through to the next. A circuit breaker benches failing keys automatically.</p>
+        <div className="divide-y">
+          {providers.map((p) => (
+            <div key={p.label} className="flex items-center justify-between gap-3 py-3 text-sm">
+              <span className="shrink-0 font-medium">{p.label}</span>
+              <span className="flex items-center gap-2 truncate">
+                <span className="truncate font-mono text-xs text-muted">{p.value}</span>
+                <span className={`h-2 w-2 shrink-0 rounded-full ${p.tone === "ok" ? "bg-[color:var(--ok)]" : "bg-[color:var(--muted)]"}`} />
+              </span>
             </div>
           ))}
         </div>

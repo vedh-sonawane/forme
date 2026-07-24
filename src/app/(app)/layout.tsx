@@ -1,12 +1,18 @@
 import { Sidebar } from "@/components/Sidebar";
 import { usingRealAI } from "@/lib/ai/provider";
-import { resolveProvider } from "@/lib/env";
+import { hasOpenRouter, hasGroq, hasCerebras, hasGithubModels, hasGemini } from "@/lib/env";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const aiLive = usingRealAI();
-  const provider = resolveProvider();
-  const label = provider === "openrouter" ? "Laguna live" : provider === "gemini" ? "Gemini live" : "Dev fallback";
-  const sub = provider === "openrouter" ? "OpenRouter · Poolside" : provider === "gemini" ? "Real AI analysis" : "No key — mock AI";
+  const names = [
+    hasOpenRouter() && "OpenRouter",
+    hasGroq() && "Groq",
+    hasCerebras() && "Cerebras",
+    hasGithubModels() && "GitHub",
+    hasGemini() && "Gemini",
+  ].filter(Boolean) as string[];
+  const label = aiLive ? "AI pool live" : "Dev fallback";
+  const sub = aiLive ? `${names.length} providers · rotating` : "No key — mock AI";
   return (
     <div className="min-h-screen">
       <Sidebar aiLive={aiLive} label={label} sub={sub} />
