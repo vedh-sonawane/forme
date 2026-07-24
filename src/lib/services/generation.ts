@@ -6,6 +6,7 @@ import {
   generateDirection,
   generateDesignSystem,
   planSceneExperience,
+  planApplicationBlueprint,
   synthesizeDNA,
   critiqueWebsite,
 } from "@/lib/agents";
@@ -18,6 +19,7 @@ import {
   RequirementsSchema,
   WebsitePlanSchema,
   ScenePlanSchema,
+  ApplicationBlueprintSchema,
   CritiqueSchema,
   type DesignDNA,
   type Requirements,
@@ -380,4 +382,17 @@ export async function restoreVersion(websiteId: string, versionId: string) {
   });
   await db.generatedWebsite.update({ where: { id: site.id }, data: { currentVersionId: restored.id } });
   return { versionId: restored.id, fromVersion: source.version };
+}
+
+// ── Application Blueprint: plan the full-stack app before generation (Track B) ─────
+export async function generateApplicationBlueprint(projectId: string) {
+  const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+  const requirements = await ensureRequirements(project);
+  const dirRow = await db.designDirection.findFirst({ where: { projectId }, orderBy: { version: "desc" } });
+  const direction = dirRow ? DesignDirectionSchema.parse(parseJSON(dirRow.direction, {})) : null;
+
+  const res = await planApplicationBlueprint(requirements, direction);
+  const blueprint = ApplicationBlueprintSchema.parse(res.data);
+  await db.project.update({ where: { id: projectId }, data: { blueprint: toJSON(blueprint) } });
+  return { blueprint, usedFallback: res.usedFallback };
 }

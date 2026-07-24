@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
@@ -11,11 +11,12 @@ import { cn } from "@/lib/utils";
 import { DirectionView, SystemPreview, CritiqueView } from "./Viewers";
 import { PreviewFrame } from "./PreviewFrame";
 
-type Tab = "overview" | "references" | "direction" | "build" | "redesign" | "versions";
+type Tab = "overview" | "references" | "direction" | "blueprint" | "build" | "redesign" | "versions";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "references", label: "References" },
   { id: "direction", label: "Design Direction" },
+  { id: "blueprint", label: "App Blueprint" },
   { id: "build", label: "Build & Critique" },
   { id: "redesign", label: "Redesign" },
   { id: "versions", label: "Versions" },
@@ -209,6 +210,9 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         </div>
       )}
 
+      {/* APP BLUEPRINT */}
+      {tab === "blueprint" && <BlueprintTab projectId={p.id} />}
+
       {/* BUILD & CRITIQUE */}
       {tab === "build" && (
         <BuildTab
@@ -361,6 +365,117 @@ function BuildTab({
         </div>
 
         {selected.critique ? <CritiqueView critique={selected.critique} /> : <div className="card p-5 text-sm text-muted">No critique for this version.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── App Blueprint tab: the full-stack plan (Track B foundation) ───────────────────
+type Blueprint = {
+  summary: string; app_type: string; business_goals: string[]; architecture: string;
+  entities: { name: string; description: string; fields: { name: string; type: string; note: string }[] }[];
+  relationships: { from: string; to: string; kind: string }[];
+  pages: { name: string; path: string; purpose: string; auth: boolean }[];
+  api_endpoints: { method: string; path: string; purpose: string; auth: boolean }[];
+  auth: { required: boolean; methods: string[]; roles: string[] };
+  backend_services: string[]; integrations: string[]; env_vars: string[];
+  deployment: string; testing_plan: string[]; scaling_notes: string;
+};
+
+function BpSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div className="card p-5"><h3 className="mb-3 text-sm font-semibold">{title}</h3>{children}</div>;
+}
+
+function BlueprintTab({ projectId }: { projectId: string }) {
+  const [bp, setBp] = useState<Blueprint | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [gen, setGen] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try { const d = await api<{ blueprint: Blueprint | null }>(`/api/projects/${projectId}/blueprint`); if (alive) setBp(d.blueprint); }
+      catch { /* none yet */ }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [projectId]);
+
+  async function generate() {
+    setGen(true); setErr(null);
+    try { const d = await api<{ blueprint: Blueprint }>(`/api/projects/${projectId}/blueprint`, { method: "POST" }); setBp(d.blueprint); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Failed to plan the app."); }
+    finally { setGen(false); }
+  }
+
+  if (loading) return <div className="card p-6 text-sm text-muted">Loading blueprint…</div>;
+
+  if (!bp) return (
+    <EmptyState
+      title="No application blueprint yet"
+      desc="Plan the full-stack app — entities, pages, API, auth, and deployment — before generating. This is the foundation for full app generation."
+      action={<button className="btn-primary" onClick={generate} disabled={gen}>{gen ? <Spinner className="h-4 w-4" /> : null}{gen ? "Planning…" : "Generate blueprint"}</button>}
+    />
+  );
+
+  return (
+    <div className="animate-in space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2"><Badge tone="accent">{bp.app_type || "app"}</Badge><span className="text-sm font-semibold">Application Blueprint</span></div>
+          <p className="mt-1 max-w-2xl text-sm text-fg-dim">{bp.summary}</p>
+        </div>
+        <button className="btn-ghost" onClick={generate} disabled={gen}>{gen ? <Spinner className="h-4 w-4" /> : null}{gen ? "Re-planning…" : "Regenerate"}</button>
+      </div>
+      {err && <div className="rounded-xl border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-4 py-2 text-sm text-[color:var(--danger)]">{err}</div>}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BpSection title="Data model">
+          <div className="space-y-3">
+            {bp.entities.map((e) => (
+              <div key={e.name} className="rounded-xl border p-3">
+                <div className="font-medium">{e.name}</div>
+                {e.description && <div className="text-xs text-muted">{e.description}</div>}
+                <div className="mt-2 flex flex-wrap gap-1.5">{e.fields.map((f) => <span key={f.name} className="chip">{f.name}<span className="text-muted">: {f.type}</span></span>)}</div>
+              </div>
+            ))}
+            {bp.relationships.length > 0 && <div className="mt-1 text-xs text-fg-dim">{bp.relationships.map((r, i) => <div key={i}>• {r.from} — {r.kind} — {r.to}</div>)}</div>}
+          </div>
+        </BpSection>
+
+        <BpSection title="Pages & routes">
+          <ul className="space-y-1.5 text-sm">{bp.pages.map((pg) => (
+            <li key={pg.path + pg.name} className="flex items-center justify-between gap-2">
+              <span><span className="font-mono text-xs text-fg-dim">{pg.path}</span> · {pg.name}</span>
+              {pg.auth && <Badge tone="warn">auth</Badge>}
+            </li>
+          ))}</ul>
+        </BpSection>
+
+        <BpSection title="API endpoints">
+          <ul className="space-y-1.5 text-sm">{bp.api_endpoints.map((ep, i) => (
+            <li key={i} className="flex items-center gap-2"><span className="w-14 shrink-0 font-mono text-[11px] text-[color:var(--accent)]">{ep.method}</span><span className="truncate font-mono text-xs text-fg-dim">{ep.path}</span>{ep.auth && <Badge tone="warn">auth</Badge>}</li>
+          ))}</ul>
+        </BpSection>
+
+        <BpSection title="Auth & services">
+          <div className="space-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-1.5">Authentication: {bp.auth.required ? <Badge tone="ok">required</Badge> : <Badge>optional</Badge>}{bp.auth.methods.map((m) => <Badge key={m}>{m}</Badge>)}</div>
+            {bp.auth.roles.length > 0 && <div className="flex flex-wrap items-center gap-1.5">Roles: {bp.auth.roles.map((r) => <Badge key={r} tone="accent">{r}</Badge>)}</div>}
+            <div className="flex flex-wrap gap-1.5">{bp.backend_services.map((s) => <span key={s} className="chip">{s}</span>)}</div>
+          </div>
+        </BpSection>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <BpSection title="Env vars"><div className="flex flex-wrap gap-1.5">{bp.env_vars.map((v) => <span key={v} className="chip font-mono">{v}</span>)}</div></BpSection>
+        <BpSection title="Deployment"><p className="text-sm text-fg-dim">{bp.deployment}</p></BpSection>
+        <BpSection title="Testing plan"><ul className="space-y-1 text-sm text-fg-dim">{bp.testing_plan.map((t) => <li key={t}>• {t}</li>)}</ul></BpSection>
+      </div>
+
+      <div className="card border-accent/30 bg-accent/5 p-4 text-sm text-fg-dim">
+        This is the planning foundation for <span className="font-medium text-fg">full-stack app generation</span> — generating a multi-file, runnable app from this blueprint is the next Track B phase.
       </div>
     </div>
   );

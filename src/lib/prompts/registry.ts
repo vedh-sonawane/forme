@@ -312,6 +312,26 @@ Return the Design DNA (same shape) PLUS emphasize weaknesses. Shape:
 ${DNA_SHAPE}`,
     }),
   },
+
+  "application-blueprint-v1": {
+    operation: "application-blueprint",
+    build: (input: { requirements: string; directionJson?: string }): BuiltPrompt => ({
+      system: `You are an Application Architect. BEFORE any code, produce a complete, decisive APPLICATION
+BLUEPRINT for a real production web app that fulfills the user's requirements — not just a marketing page.
+Think end-to-end: data model, pages, routes, API, authentication/roles, backend services, integrations,
+environment variables, deployment, and a testing plan. Be specific and realistic; choose sensible entities
+and fields. Only require authentication if the app genuinely needs user accounts. ${JSON_ONLY}`,
+      user: `Requirements:\n${input.requirements}\n${input.directionJson ? `\nDesign direction (for context):\n${input.directionJson}\n` : ""}
+Return JSON:
+{"summary","app_type","business_goals":[],"architecture",
+ "entities":[{"name","description","fields":[{"name","type","note"}]}],
+ "relationships":[{"from","to","kind"}],
+ "pages":[{"name","path","purpose","auth":false}],
+ "api_endpoints":[{"method","path","purpose","auth":false}],
+ "auth":{"required":false,"methods":[],"roles":[]},
+ "backend_services":[],"integrations":[],"env_vars":[],"deployment","testing_plan":[],"scaling_notes"}`,
+    }),
+  },
 } as const;
 
 export type PromptName = keyof typeof prompts;

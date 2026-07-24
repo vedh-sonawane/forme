@@ -52,6 +52,8 @@ model Project {
   description  String?
   // Structured user requirements (JSON string): business, audience, pages, brand, etc.
   requirements String?
+  // Application Blueprint (JSON string): full-stack plan — entities, pages, API, auth, deploy.
+  blueprint    String?
   status       String   @default("draft") // draft | researching | directed | generating | critiquing | ready
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

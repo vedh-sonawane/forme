@@ -240,6 +240,42 @@ export const WebsitePlanSchema = z.object({
 });
 export type WebsitePlan = z.infer<typeof WebsitePlanSchema>;
 
+// ── APPLICATION BLUEPRINT (full-stack planning, before any code) ─────────────────
+// The structured plan an Application Architect produces so the app is designed before
+// it is generated: entities, relationships, pages, routes, auth, API, data, deploy.
+export const ApplicationBlueprintSchema = z.object({
+  summary: str,
+  app_type: str, // saas | marketplace | dashboard | crm | portfolio | booking | e-commerce | internal-tool | …
+  business_goals: strArr,
+  architecture: str,
+  entities: z
+    .array(
+      z.object({
+        name: str,
+        description: str,
+        fields: z.array(z.object({ name: str, type: str, note: str })).default([]),
+      })
+    )
+    .default([]),
+  relationships: z.array(z.object({ from: str, to: str, kind: str })).default([]), // e.g. one-to-many
+  pages: z.array(z.object({ name: str, path: z.string().default("/"), purpose: str, auth: z.boolean().default(false) })).default([]),
+  api_endpoints: z.array(z.object({ method: str, path: str, purpose: str, auth: z.boolean().default(false) })).default([]),
+  auth: z
+    .object({
+      required: z.boolean().default(false),
+      methods: strArr, // email-password | oauth | magic-link | …
+      roles: strArr,
+    })
+    .default({}),
+  backend_services: strArr,
+  integrations: strArr,
+  env_vars: strArr,
+  deployment: str,
+  testing_plan: strArr,
+  scaling_notes: str,
+});
+export type ApplicationBlueprint = z.infer<typeof ApplicationBlueprintSchema>;
+
 // ── REQUIREMENTS ────────────────────────────────────────────────────────────────
 export const RequirementsSchema = z.object({
   business: str,

@@ -363,6 +363,50 @@ function capitalize(s: string) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+// Deterministic Application Blueprint derived from the requirements JSON in the prompt.
+function applicationBlueprint(promptUser: string) {
+  const business = promptUser.match(/"business"\s*:\s*"([^"]*)"/)?.[1] || "your product";
+  const product = promptUser.match(/"product"\s*:\s*"([^"]*)"/)?.[1] || "";
+  const brand = product && product.trim() ? product.trim() : deriveBrand(business);
+  const goalsM = promptUser.match(/"goals"\s*:\s*\[([^\]]*)\]/);
+  const goals = goalsM ? goalsM[1].split(/"\s*,\s*"/).map((s) => s.replace(/^\s*"|"\s*$/g, "").trim()).filter(Boolean) : [];
+  const funcsM = promptUser.match(/"functionality"\s*:\s*\[([^\]]*)\]/);
+  const funcs = funcsM ? funcsM[1].split(/"\s*,\s*"/).map((s) => s.replace(/^\s*"|"\s*$/g, "").trim()).filter(Boolean) : [];
+  const entityName = brand.split(/\s+/)[0].replace(/[^A-Za-z]/g, "") || "Item";
+
+  return {
+    summary: `A production web application for ${business.slice(0, 160)}`,
+    app_type: "saas",
+    business_goals: goals.length ? goals : ["deliver core value", "acquire users", "retain and grow"],
+    architecture: "Next.js (App Router) + Prisma + a relational database. Server components for reads, route handlers/server actions for writes, session-based auth.",
+    entities: [
+      { name: "User", description: "An account holder.", fields: [{ name: "id", type: "uuid", note: "pk" }, { name: "email", type: "string", note: "unique" }, { name: "name", type: "string", note: "" }, { name: "role", type: "enum(user,admin)", note: "" }, { name: "createdAt", type: "datetime", note: "" }] },
+      { name: entityName, description: `Core record for ${brand}.`, fields: [{ name: "id", type: "uuid", note: "pk" }, { name: "title", type: "string", note: "" }, { name: "status", type: "enum", note: "" }, { name: "ownerId", type: "uuid", note: "fk → User" }, { name: "createdAt", type: "datetime", note: "" }] },
+    ],
+    relationships: [{ from: "User", to: entityName, kind: "one-to-many" }],
+    pages: [
+      { name: "Landing", path: "/", purpose: "Marketing homepage", auth: false },
+      { name: "Sign in / Sign up", path: "/login", purpose: "Authentication", auth: false },
+      { name: "Dashboard", path: "/dashboard", purpose: "Authenticated home", auth: true },
+      { name: `${entityName} list`, path: "/app", purpose: `Browse ${entityName.toLowerCase()}s`, auth: true },
+      { name: "Settings", path: "/settings", purpose: "Account & preferences", auth: true },
+    ],
+    api_endpoints: [
+      { method: "POST", path: "/api/auth/register", purpose: "Create account", auth: false },
+      { method: "POST", path: "/api/auth/login", purpose: "Sign in", auth: false },
+      { method: "GET", path: `/api/${entityName.toLowerCase()}s`, purpose: `List ${entityName.toLowerCase()}s`, auth: true },
+      { method: "POST", path: `/api/${entityName.toLowerCase()}s`, purpose: `Create ${entityName.toLowerCase()}`, auth: true },
+    ],
+    auth: { required: true, methods: ["email-password"], roles: ["user", "admin"] },
+    backend_services: ["Authentication & sessions", "Data access (Prisma)", "File storage", "Transactional email"].concat(funcs.some((f) => /analytic/i.test(f)) ? ["Analytics"] : []),
+    integrations: [],
+    env_vars: ["DATABASE_URL", "AUTH_SECRET", "STORAGE_DIR"],
+    deployment: "Vercel (or any Node host) + a managed Postgres database.",
+    testing_plan: ["Unit tests for services", "API route tests", "Auth flow end-to-end", "Accessibility checks"],
+    scaling_notes: "Stateless request handlers, DB connection pooling, cache hot reads, background jobs for heavy work.",
+  };
+}
+
 function websitePlan() {
   return {
     pages: [
@@ -443,6 +487,9 @@ export class MockProvider implements AiProvider {
         break;
       case "scene-plan":
         payload = scenePlan(opts.user, seed);
+        break;
+      case "application-blueprint":
+        payload = applicationBlueprint(opts.user);
         break;
       case "visual-critique":
         payload = critique(seed);

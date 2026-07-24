@@ -7,6 +7,7 @@ import {
   DesignSystemSchema,
   WebsitePlanSchema,
   ScenePlanSchema,
+  ApplicationBlueprintSchema,
   RequirementsSchema,
   CritiqueSchema,
   QualityEvalSchema,
@@ -15,6 +16,7 @@ import {
   type DesignSystem,
   type WebsitePlan,
   type ScenePlan,
+  type ApplicationBlueprint,
   type Requirements,
   type Critique,
   type QualityEval,
@@ -95,6 +97,15 @@ export async function planSceneExperience(requirements: Requirements, direction:
   return structured(
     { operation: p.operation, promptVersion: "scene-plan-v1", model: "pro", maxOutputTokens: 16000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
     ScenePlanSchema
+  );
+}
+
+// ── Application Architect: plan a full-stack app before generation ──────────────
+export async function planApplicationBlueprint(requirements: Requirements, direction?: DesignDirection | null): Promise<StructuredResult<ApplicationBlueprint>> {
+  const p = prompts["application-blueprint-v1"];
+  return structured(
+    { operation: p.operation, promptVersion: "application-blueprint-v1", model: "pro", maxOutputTokens: 16000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: direction ? JSON.stringify(direction) : undefined }) },
+    ApplicationBlueprintSchema
   );
 }
 
