@@ -93,7 +93,7 @@ export async function planWebsite(requirements: Requirements, direction: DesignD
 export async function planSceneExperience(requirements: Requirements, direction: DesignDirection): Promise<StructuredResult<ScenePlan>> {
   const p = prompts["scene-plan-v1"];
   return structured(
-    { operation: p.operation, promptVersion: "scene-plan-v1", model: "pro", ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
+    { operation: p.operation, promptVersion: "scene-plan-v1", model: "pro", maxOutputTokens: 16000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
     ScenePlanSchema
   );
 }

@@ -21,9 +21,10 @@ const BRAND_STOP = new Set([
 ]);
 
 function deriveBrand(product: string, business: string): string {
+  // `product` is the project name (the brand) — use it faithfully, only capping length.
   const fromProduct = product.trim();
   if (fromProduct && !BRAND_STOP.has(fromProduct.toLowerCase())) {
-    return fromProduct.split(/[\s—-]/).filter(Boolean).slice(0, 2).join(" ").slice(0, 24);
+    return fromProduct.split(/\s+/).filter(Boolean).slice(0, 4).join(" ").slice(0, 34);
   }
   const words = business.replace(/[^a-zA-Z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
   const significant = words.filter((w) => !BRAND_STOP.has(w.toLowerCase()));

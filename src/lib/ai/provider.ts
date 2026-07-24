@@ -2,28 +2,57 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { env, resolveProvider } from "@/lib/env";
 import { GeminiProvider } from "./gemini";
+import { OpenRouterProvider } from "./openrouter";
 import { MockProvider } from "./mock";
 import type { AiProvider, GenerateOptions, GenerateResult, AiCallMeta } from "./types";
 
 let _mock: MockProvider | null = null;
 let _gemini: GeminiProvider | null = null;
+let _openrouter: OpenRouterProvider | null = null;
 
 function mockProvider(): MockProvider {
   if (!_mock) _mock = new MockProvider();
   return _mock;
 }
+function geminiProvider(): GeminiProvider {
+  if (!_gemini) _gemini = new GeminiProvider(env.geminiApiKey);
+  return _gemini;
+}
+function openrouterProvider(): OpenRouterProvider {
+  if (!_openrouter) _openrouter = new OpenRouterProvider(env.openrouterApiKey);
+  return _openrouter;
+}
 
-/** The provider actually used, based on env + key availability. */
+/** The single preferred provider (kept for callers that just want "the" provider). */
 export function getProvider(): AiProvider {
-  if (resolveProvider() === "gemini") {
-    if (!_gemini) _gemini = new GeminiProvider(env.geminiApiKey);
-    return _gemini;
-  }
+  const which = resolveProvider();
+  if (which === "openrouter") return openrouterProvider();
+  if (which === "gemini") return geminiProvider();
   return mockProvider();
 }
 
 export function usingRealAI(): boolean {
-  return resolveProvider() === "gemini";
+  return resolveProvider() !== "mock";
+}
+
+/**
+ * Ordered provider chain: preferred real provider first, then the OTHER real provider
+ * (so when the preferred one exhausts its daily quota we keep using real AI instead of
+ * dropping to the generic mock), then mock as the guaranteed last resort.
+ */
+function providerChain(): AiProvider[] {
+  const chain: AiProvider[] = [];
+  const hasGemini = env.geminiApiKey.trim().length > 0;
+  const hasOR = env.openrouterApiKey.trim().length > 0;
+  const preferred = resolveProvider();
+
+  const order: ("gemini" | "openrouter")[] = preferred === "openrouter" ? ["openrouter", "gemini"] : ["gemini", "openrouter"];
+  for (const name of order) {
+    if (name === "gemini" && hasGemini) chain.push(geminiProvider());
+    if (name === "openrouter" && hasOR) chain.push(openrouterProvider());
+  }
+  chain.push(mockProvider());
+  return chain;
 }
 
 async function logCall(meta: AiCallMeta) {
@@ -47,22 +76,20 @@ async function logCall(meta: AiCallMeta) {
   }
 }
 
-/** Raw text generation with logging + graceful fallback to mock on provider error. */
+/** Raw text generation: walk the provider chain until one succeeds; log every attempt. */
 export async function generateRaw(opts: GenerateOptions): Promise<GenerateResult & { usedFallback: boolean }> {
-  const provider = getProvider();
-  let result = await provider.generate(opts);
-  let usedFallback = false;
-
-  if (!result.meta.ok && provider.name !== "mock") {
-    // Real provider failed (bad key, rate limit, network). Fall back so the app works.
-    const fb = await mockProvider().generate(opts);
-    await logCall(result.meta); // record the failure too
-    result = fb;
-    usedFallback = true;
+  const chain = providerChain();
+  let last: GenerateResult | null = null;
+  for (const provider of chain) {
+    const result = await provider.generate(opts);
+    await logCall(result.meta);
+    if (result.meta.ok) {
+      return { ...result, usedFallback: provider.name === "mock" };
+    }
+    last = result;
   }
-
-  await logCall(result.meta);
-  return { ...result, usedFallback };
+  // Should be unreachable (mock always succeeds), but stay safe.
+  return { ...(last as GenerateResult), usedFallback: true };
 }
 
 function extractJSON(text: string): string {
@@ -88,9 +115,8 @@ export type StructuredResult<T> = {
 
 /**
  * Generate structured output validated against a zod schema.
- * - forces JSON mode
  * - parses + validates
- * - on validation failure with the real provider, retries once with a repair note
+ * - on validation failure with a real provider, retries once with a repair note
  * - on repeated failure, uses the mock provider's schema-valid output
  */
 export async function structured<S extends z.ZodTypeAny>(
@@ -113,7 +139,7 @@ export async function structured<S extends z.ZodTypeAny>(
     return { data: first.data, meta: first.res.meta, usedFallback: first.res.usedFallback, raw: first.res.text };
   }
 
-  // Repair attempt (only meaningful for the real provider).
+  // Repair attempt.
   const repair = await attempt({
     ...opts,
     json: true,

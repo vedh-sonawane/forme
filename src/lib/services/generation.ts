@@ -5,7 +5,6 @@ import {
   analyzeRequirements,
   generateDirection,
   generateDesignSystem,
-  planWebsite,
   planSceneExperience,
   synthesizeDNA,
   critiqueWebsite,
@@ -27,13 +26,22 @@ import type { ImageInput } from "@/lib/ai/types";
 
 // ── Requirements: derive structured requirements from the project's raw idea ─────
 export async function ensureRequirements(project: { id: string; name: string; description: string | null; requirements: string | null }): Promise<Requirements> {
+  // The project NAME is the brand — keep it authoritative so the generated site's
+  // header/copy always uses it (never an AI-guessed name from the description).
+  const brand = (project.name || "").trim();
   const parsed = parseJSON<Record<string, unknown>>(project.requirements, {});
   // If already structured (has business/goals), reuse it.
   if (parsed && typeof parsed.business === "string" && parsed.business) {
-    return RequirementsSchema.parse(parsed);
+    const reqs = RequirementsSchema.parse(parsed);
+    if (brand && reqs.product !== brand) {
+      reqs.product = brand;
+      await db.project.update({ where: { id: project.id }, data: { requirements: toJSON(reqs) } });
+    }
+    return reqs;
   }
   const raw = (parsed.rawIdea as string) || project.description || project.name;
   const res = await analyzeRequirements(raw, project.description ?? undefined);
+  if (brand) res.data.product = brand;
   await db.project.update({ where: { id: project.id }, data: { requirements: toJSON(res.data) } });
   return res.data;
 }
@@ -132,10 +140,12 @@ export async function generateProjectWebsite(projectId: string, directionId?: st
 
   await db.project.update({ where: { id: projectId }, data: { status: "generating" } });
 
-  const plan = await planWebsite(requirements, direction);
+  // Scene plan supersedes the old page-architecture step (code-gen consumes scenes),
+  // so we skip that extra model call for speed/quota. Keep an empty plan for the type.
+  const plan = WebsitePlanSchema.parse({});
   const sceneRes = await planSceneExperience(requirements, direction);
   const scenes = ScenePlanSchema.parse(sceneRes.data);
-  const code = await generateWebsiteCode({ requirements, direction, system, plan: WebsitePlanSchema.parse(plan.data), scenes });
+  const code = await generateWebsiteCode({ requirements, direction, system, plan, scenes });
 
   const site = await db.generatedWebsite.create({
     data: { projectId, directionId: dirRow.id, kind: "new", title: `${project.name} — v1`, status: "rendered", scenePlan: toJSON(scenes) },
@@ -204,10 +214,10 @@ export async function redesignProjectWebsite(projectId: string) {
 
   await db.project.update({ where: { id: projectId }, data: { status: "generating" } });
 
-  const plan = await planWebsite(requirements, dir.data);
+  const plan = WebsitePlanSchema.parse({});
   const sceneRes = await planSceneExperience(requirements, dir.data);
   const scenes = ScenePlanSchema.parse(sceneRes.data);
-  const code = await generateWebsiteCode({ requirements, direction: dir.data, system: sys.data, plan: WebsitePlanSchema.parse(plan.data), scenes });
+  const code = await generateWebsiteCode({ requirements, direction: dir.data, system: sys.data, plan, scenes });
 
   const site = await db.generatedWebsite.create({
     data: { projectId, directionId: direction.id, kind: "redesign", title: `${target.title || project.name} — redesign`, status: "rendered", scenePlan: toJSON(scenes) },
@@ -242,7 +252,7 @@ export async function improveWebsite(websiteId: string) {
   const direction = site.direction ? DesignDirectionSchema.parse(parseJSON(site.direction.direction, {})) : DesignDirectionSchema.parse({});
   const sysRow = site.direction?.designSystems?.[0];
   const system = sysRow ? DesignSystemSchema.parse(parseJSON(sysRow.tokens, {})) : DesignSystemSchema.parse({});
-  const plan = WebsitePlanSchema.parse((await planWebsite(requirements, direction)).data);
+  const plan = WebsitePlanSchema.parse({});
   const critique = CritiqueSchema.parse(parseJSON(critRow.report, {}));
   const scenes = site.scenePlan ? ScenePlanSchema.parse(parseJSON(site.scenePlan, {})) : null;
 

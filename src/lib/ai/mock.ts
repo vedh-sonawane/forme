@@ -258,7 +258,8 @@ function scenePlan(promptUser: string, seed: number) {
   const pMatch = promptUser.match(/"product"\s*:\s*"([^"]*)"/);
   const business = (bMatch ? bMatch[1] : extractIdea(promptUser)) || "your product";
   const product = pMatch ? pMatch[1] : "";
-  const brand = deriveBrand(product && product.trim() ? product : business);
+  // product is the project name (the brand) — use it verbatim when present.
+  const brand = product && product.trim() ? product.trim().split(/\s+/).slice(0, 4).join(" ").slice(0, 34) : deriveBrand(business);
   const short = business.split(/(?<=[.!?])\s+/)[0].replace(/^(?:an?|the)\s+/i, "");
 
   // Honor the art direction's atmosphere (parsed from the direction JSON in the prompt):
@@ -292,10 +293,28 @@ function scenePlan(promptUser: string, seed: number) {
   const emotions = ["wonder", "curiosity", "delight", "confidence", "trust", "calm", "clarity", "urgency"];
   const SIGNATURE = 2; // the experience scene is the mid-scroll signature moment
 
-  const feats = [
-    { title: "Considered by default", body: "Type, spacing, and motion work together so every screen feels intentional.", meta: "01" },
-    { title: "Built to scale", body: "From launch to serious scale, with no rewrites required.", meta: "02" },
-    { title: "Fast and reliable", body: "Speed and stability are features here, not afterthoughts.", meta: "03" },
+  // Build honest content from the REAL extracted requirements (functionality, goals,
+  // audience) that arrive in the requirements JSON — NO fake metrics or testimonials.
+  const parseArr = (key: string) => {
+    const m = promptUser.match(new RegExp('"' + key + '"\\s*:\\s*\\[([^\\]]*)\\]'));
+    return m ? m[1].split(/"\s*,\s*"/).map((s) => s.replace(/^\s*"|"\s*$/g, "").replace(/\\"/g, '"').trim()).filter(Boolean) : [];
+  };
+  const functionality = parseArr("functionality");
+  const goals = parseArr("goals");
+  const audience = (promptUser.match(/"target_audience"\s*:\s*"([^"]*)"/)?.[1] || "").trim();
+  const rest = business.split(/(?<=[.!?])\s+/).slice(1).join(" ").trim();
+  const featTitle = (f: string) => f.split(/[:—-]/)[0].trim().split(/\s+/).slice(0, 7).join(" ");
+  const featBody = (f: string) => { const parts = f.split(/[:—]/); return (parts.length > 1 ? parts.slice(1).join(":") : f).trim(); };
+  const capabilities = (functionality.length ? functionality : [business]).map((f, i) => ({ title: capitalize(featTitle(f)), body: featBody(f), meta: String(i + 1).padStart(2, "0") }));
+  const feats = capabilities.slice(0, 3);
+  const goalItems = goals.map((g, i) => ({ title: capitalize(featTitle(g)), body: g, meta: String(i + 1).padStart(2, "0") }));
+  const mission = goals[0] || `Everything ${brand} exists to do — done with care.`;
+  const emotionalLine = goals[goals.length - 1] || mission;
+  const faqItems = [
+    { title: `What is ${brand}?`, body: business, meta: "" },
+    { title: "What can I do here?", body: capabilities.slice(0, 4).map((c) => c.title).join(" · ") || business, meta: "" },
+    { title: "Who is it for?", body: audience ? capitalize(audience) + "." : "Anyone who cares about this.", meta: "" },
+    { title: "How do I begin?", body: "Start exploring right away — everything is one click from here.", meta: "" },
   ];
 
   const scene = (i: number, o: Partial<Record<string, unknown>>) => ({
@@ -324,17 +343,17 @@ function scenePlan(promptUser: string, seed: number) {
   });
 
   return {
-    concept: `A ${art} experience that makes ${brand} feel intentional${clean ? " and effortless" : rich ? " and alive" : ""}.`,
-    narrative: "Open with a clear statement, explain why it matters, show the experience, prove it, let real voices speak, answer questions, then close with intent.",
+    concept: `A ${art} experience for ${brand} — built around what it actually does for ${audience || "the people it serves"}.`,
+    narrative: "Open with what it is, say why it matters, show what you can actually do, reinforce the purpose, land an emotional beat, answer real questions, then invite people in.",
     scenes: [
-      scene(0, { title: "The opening", role: "opening", question: "What is this?", layout: heroLayout, emphasis: "oversized", visual_idea: clean ? "One oversized typographic statement, generous whitespace" : "A single focal form floating over a quiet field", eyebrow: "Introducing", headline: capitalize(short), subcopy: `The experience ${brand} was built to deliver.` }),
-      scene(1, { title: "Why it exists", role: "context", question: "Why does this exist?", layout: "statement", emphasis: "editorial", visual_idea: "A calm full-bleed statement, nothing competing", headline: `Most tools settle. ${brand} was built to feel different.` }),
-      scene(2, { title: "The experience", role: "experience", question: "How does it work?", layout: experience, emphasis: "image", interaction: clean ? "subtle hover reveal" : "pointer-based depth", visual_idea: "The product shown in its most flattering moment — the signature beat", eyebrow: "The experience", headline: "Designed to be felt, not just used.", subcopy: "Every screen is composed with intention — clear hierarchy, honest spacing, and motion that guides the eye.", items: feats }),
-      scene(3, { title: "The proof", role: "proof", question: "Does it deliver?", layout: "metrics", emphasis: "number", visual_idea: "Oversized numbers counting up", headline: "Numbers that speak for themselves.", items: [{ title: "99.9%", body: "uptime, guaranteed", meta: "" }, { title: "3.2x", body: "faster in practice", meta: "" }, { title: "12k+", body: "teams onboard", meta: "" }] }),
-      scene(4, { title: "Voices", role: "emotional", question: "Who loves it?", layout: "quote", emphasis: "editorial", visual_idea: "A single large quote, set beautifully", headline: `Switching to ${brand} was the clearest decision we made all year.`, subcopy: "Head of Product, a technology company" }),
-      scene(5, { title: "The story", role: "calm", question: "What does it feel like?", layout: story, emphasis: "image", visual_idea: "A closer, calmer look at the details", eyebrow: "Closer look", headline: "Composed with intention.", items: feats.concat([{ title: "Made for people", body: "Accessible, responsive, a pleasure to use.", meta: "04" }, { title: "Always improving", body: "Thoughtful iteration keeps it sharp.", meta: "05" }, { title: "Secure by default", body: "Sensible protection throughout.", meta: "06" }]) }),
-      scene(6, { title: "Questions", role: "faq", question: "What should I know?", layout: "faq", emphasis: "minimal", visual_idea: "Quiet, scannable answers", eyebrow: "Questions", headline: "Good to know.", items: [{ title: `What makes ${brand} different?`, body: "Intentional design at every layer — not a template.", meta: "" }, { title: "Is it responsive?", body: "Yes — it's composed mobile-first and adapts fluidly.", meta: "" }, { title: "How fast can I start?", body: "Minutes. There's nothing to wrestle with.", meta: "" }, { title: "Can I make it my own?", body: "Absolutely — everything is editable after generation.", meta: "" }] }),
-      scene(7, { title: "The close", role: "climax", question: "What now?", layout: "cta", emphasis: "oversized", visual_idea: "A confident closing line and a single clear action", headline: `Ready to begin with ${brand}?`, subcopy: "Join the teams already building something considered." }),
+      scene(0, { title: "The opening", role: "opening", question: "What is this?", layout: heroLayout, emphasis: "oversized", visual_idea: clean ? "One oversized typographic statement, generous whitespace" : "A single focal form over a quiet field", eyebrow: capitalize(audience) || "Welcome", headline: capitalize(short), subcopy: rest || mission }),
+      scene(1, { title: "Why it exists", role: "context", question: "Why does this exist?", layout: "statement", emphasis: "editorial", visual_idea: "A calm full-bleed statement of purpose", headline: capitalize(mission) }),
+      scene(2, { title: "What you can do", role: "experience", question: "What can I actually do here?", layout: experience, emphasis: "image", interaction: clean ? "subtle hover reveal" : "pointer-based depth", visual_idea: "The core experience shown at its best — the signature beat", eyebrow: "What you can do", headline: `Inside ${brand}.`, subcopy: rest || "", items: feats }),
+      scene(3, { title: "The purpose", role: "proof", question: "Why does it matter?", layout: goalItems.length ? "feature-spotlight" : experience, emphasis: "editorial", visual_idea: "The mission, made concrete", eyebrow: "Built with purpose", headline: "What we're here to do.", items: (goalItems.length ? goalItems : capabilities.slice(3)).slice(0, 3) }),
+      scene(4, { title: "The feeling", role: "emotional", question: "Why should I care?", layout: "quote", emphasis: "editorial", visual_idea: "A single large statement, set beautifully", headline: capitalize(emotionalLine) }),
+      scene(5, { title: "A closer look", role: "calm", question: "What does it feel like?", layout: story, emphasis: "image", visual_idea: "A calm, closer look at the details", eyebrow: "Explore", headline: "Everything, in one place.", items: capabilities.slice(0, 6) }),
+      scene(6, { title: "Questions", role: "faq", question: "What should I know?", layout: "faq", emphasis: "minimal", visual_idea: "Quiet, scannable answers", eyebrow: "Questions", headline: "Good to know.", items: faqItems }),
+      scene(7, { title: "The close", role: "climax", question: "What now?", layout: "cta", emphasis: "oversized", visual_idea: "A confident closing line and a single clear action", headline: `Begin with ${brand}.`, subcopy: mission }),
     ],
   };
 }

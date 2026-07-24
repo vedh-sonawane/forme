@@ -54,7 +54,8 @@ h1,h2,h3,h4{font-family:var(--font-heading);font-weight:var(--w-head);line-heigh
 a{color:inherit;text-decoration:none}
 img,svg{max-width:100%;display:block}
 p{color:var(--text-muted)}
-.container{width:100%;max-width:var(--container);margin-inline:auto;padding-inline:clamp(1.2rem,4vw,2.2rem)}
+.container,.container-wide,.container-narrow{width:100%;margin-inline:auto;padding-inline:clamp(1.2rem,4vw,2.2rem)}
+.container{max-width:var(--container)}
 .container-wide{max-width:min(1440px,94vw)}
 .container-narrow{max-width:760px}
 .section{padding-block:var(--section)}
