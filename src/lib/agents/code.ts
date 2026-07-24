@@ -31,6 +31,35 @@ function extractHtml(text: string): string | null {
   return doc;
 }
 
+// Guarantee no dead links in a self-contained single-page site: rewrite any local
+// path/relative links (which would 404) to in-page anchors, point #anchors that have
+// no target to #top, and ensure a #top target exists. External http/mailto/tel are left.
+export function sanitizeLinks(html: string): string {
+  const ids = new Set<string>();
+  const idRe = /\sid=["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = idRe.exec(html))) ids.add(m[1].toLowerCase());
+
+  let out = html.replace(/(<a\b[^>]*\shref=)(["'])(.*?)\2/gi, (full, pre, q, href) => {
+    const h = href.trim();
+    if (/^(https?:|mailto:|tel:|\/\/)/i.test(h)) return full; // external — keep
+    if (h.startsWith("#")) {
+      const target = h.slice(1).toLowerCase();
+      if (!target || (!ids.has(target) && target !== "top")) return `${pre}${q}#top${q}`;
+      return full;
+    }
+    // relative path / anything else on a single-page site → safe in-page anchor
+    return `${pre}${q}#top${q}`;
+  });
+
+  // Ensure a #top target exists.
+  if (!ids.has("top")) {
+    out = out.replace(/<body([^>]*)>/i, (mm, attrs) => (/\bid=/.test(attrs) ? mm : `<body${attrs} id="top">`));
+    if (!/<body[^>]*\bid=/i.test(out)) out = out.replace(/<body([^>]*)>/i, `<body$1 id="top">`);
+  }
+  return out;
+}
+
 export type CodeGenResult = { html: string; meta: AiCallMeta; usedFallback: boolean; source: "llm" | "baseline" };
 
 // ── Code Generator ───────────────────────────────────────────────────────────────
@@ -79,9 +108,81 @@ export async function generateWebsiteCode(input: {
   });
 
   const html = res.meta.ok ? extractHtml(res.text) : null;
-  if (html) return { html: injectFailsafe(html), meta: res.meta, usedFallback: res.usedFallback, source: "llm" };
+  if (html) return { html: sanitizeLinks(injectFailsafe(html)), meta: res.meta, usedFallback: res.usedFallback, source: "llm" };
   // LLM failed or produced malformed HTML → baseline keeps the product working.
-  return { html: baseline, meta: res.meta, usedFallback: true, source: "baseline" };
+  return { html: sanitizeLinks(baseline), meta: res.meta, usedFallback: true, source: "baseline" };
+}
+
+// Pull a CSS body out of model output (strip fences / stray <style> tags / prose).
+function extractCss(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/```(?:css)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  t = t.replace(/<\/?style[^>]*>/gi, "").trim();
+  // If the model prepended prose, start at the first CSS-looking token.
+  const at = t.search(/@import|@font-face|@keyframes|[.#:a-zA-Z\[][^{]*\{/);
+  if (at > 0) t = t.slice(at);
+  return t.trim();
+}
+
+// Inject the premium CSS layer LAST so it overrides the site's own styles.
+function injectRefineCss(html: string, css: string): string {
+  const tag = `<style id="forme-refine">\n${css}\n</style>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${tag}\n</head>`);
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${tag}\n</body>`);
+  return html + tag;
+}
+
+// ── Refine Agent: keep the REAL page intact, inject a premium CSS layer over it ─────
+// This preserves ALL content and links (we never rewrite the markup) and is fast
+// (CSS is far smaller than a full HTML regen). Faithful to "refine, don't rebuild".
+export async function refineWebsiteCode(input: { url: string; html: string }): Promise<CodeGenResult> {
+  const capped = input.html.length > 26000 ? input.html.slice(0, 26000) + "\n<!-- …truncated… -->" : input.html;
+  const p = prompts["refine-css-v1"];
+  const res = await generateRaw({
+    operation: p.operation,
+    promptVersion: "refine-css-v1",
+    model: "pro",
+    maxOutputTokens: 14000,
+    temperature: 0.5,
+    thinking: false,
+    ...p.build({ url: input.url, html: capped }),
+  });
+  const css = res.meta.ok ? extractCss(res.text) : "";
+  if (css && css.length > 60) {
+    return { html: injectRefineCss(input.html, css), meta: res.meta, usedFallback: res.usedFallback, source: "llm" };
+  }
+  // Fallback: keep the original captured HTML (valid, just unrefined).
+  return { html: input.html, meta: res.meta, usedFallback: true, source: "baseline" };
+}
+
+// ── Chat copilot: apply a natural-language edit, or answer a question ───────────────
+export type ChatEditResult = { action: "edit" | "answer"; reply: string; html?: string; usedFallback: boolean };
+export async function chatEditWebsite(input: { html: string; message: string }): Promise<ChatEditResult> {
+  const capped = input.html.length > 26000 ? input.html.slice(0, 26000) : input.html;
+  const p = prompts["chat-edit-v1"];
+  const res = await generateRaw({
+    operation: p.operation,
+    promptVersion: "chat-edit-v1",
+    model: "pro",
+    maxOutputTokens: 40000,
+    temperature: 0.4,
+    thinking: false,
+    ...p.build({ html: capped, message: input.message }),
+  });
+  if (!res.meta.ok) return { action: "answer", reply: "I hit an error reaching the model — try again in a moment.", usedFallback: true };
+
+  const text = res.text;
+  const marker = text.indexOf("---HTML---");
+  const hasDoc = /<!doctype html>|<html[\s>]/i.test(text);
+  if (marker !== -1 || hasDoc) {
+    const html = extractHtml(marker !== -1 ? text.slice(marker) : text);
+    if (html) {
+      const reply = (marker !== -1 ? text.slice(0, marker) : text.split(/<!doctype html>|<html[\s>]/i)[0]).trim() || "Done — applied your change.";
+      return { action: "edit", reply: reply.slice(0, 400), html: sanitizeLinks(injectFailsafe(html)), usedFallback: res.usedFallback };
+    }
+  }
+  return { action: "answer", reply: text.trim().slice(0, 800) || "Sorry, I couldn't process that.", usedFallback: res.usedFallback };
 }
 
 // ── Improvement Agent ─────────────────────────────────────────────────────────────
@@ -171,7 +272,7 @@ export async function improveWebsiteCode(input: {
   const html = res.meta.ok ? extractHtml(res.text) : null;
   if (html) {
     return {
-      html: injectFailsafe(html),
+      html: sanitizeLinks(injectFailsafe(html)),
       systemUsed: input.system,
       changeNote: `Applied ${targeted.length} critique fix(es): ${targeted.map((i) => i.category).join(", ")}.`,
       meta: res.meta,

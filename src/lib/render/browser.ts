@@ -217,6 +217,83 @@ async function forceReveal(page: any) {
   }
 }
 
+export type UrlCode = { finalUrl: string; title: string; html: string; inlinedBytes: number };
+
+/**
+ * Safely capture a public URL's REAL code as a self-contained HTML document:
+ * inlines accessible stylesheet rules, adds <base href> so remaining assets/links
+ * resolve to the origin, and strips scripts (they won't run standalone + safety).
+ * This is the true source we hand to the refiner and store as the "original".
+ */
+export async function captureUrlCode(rawUrl: string): Promise<UrlCode> {
+  const guard = await guardUrl(rawUrl);
+  if (!guard.ok) throw new Error(`URL blocked: ${guard.reason}`);
+
+  const browser = await launch();
+  try {
+    const context = await browser.newContext({
+      viewport: DESKTOP,
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) FORME-DesignBot/1.0 (+design refine)",
+      acceptDownloads: false,
+    });
+    context.setDefaultNavigationTimeout(25000);
+    const page = await context.newPage();
+    page.on("download", (d: { cancel: () => void }) => d.cancel());
+
+    await page.goto(guard.url.toString(), { waitUntil: "domcontentloaded" });
+    const finalUrl = page.url();
+    const finalGuard = await guardUrl(finalUrl);
+    if (!finalGuard.ok) throw new Error(`Redirect blocked: ${finalGuard.reason}`);
+    await page.waitForTimeout(1000);
+    try { await page.waitForLoadState("networkidle", { timeout: 5000 }); } catch { /* fine */ }
+
+    const title = (await page.title().catch(() => "")) || finalGuard.url.hostname;
+
+    const { css, bodyHtml, headHtml, lang } = await page.evaluate(() => {
+      // Collect accessible (same-origin) stylesheet rules.
+      let css = "";
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          for (const rule of Array.from(sheet.cssRules)) css += rule.cssText + "\n";
+        } catch {
+          /* cross-origin sheet — keep its <link> so it loads via <base href> */
+        }
+      }
+      // Remove scripts, event handlers, and existing base tags from a clone.
+      const doc = document.documentElement.cloneNode(true) as HTMLElement;
+      doc.querySelectorAll("script,base,noscript").forEach((n) => n.remove());
+      doc.querySelectorAll("*").forEach((el) => {
+        for (const attr of Array.from(el.attributes)) {
+          if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+        }
+      });
+      const head = doc.querySelector("head")?.innerHTML ?? "";
+      const body = doc.querySelector("body")?.innerHTML ?? doc.innerHTML;
+      return { css: css.slice(0, 300000), bodyHtml: body, headHtml: head, lang: document.documentElement.lang || "en" };
+    });
+
+    await context.close();
+
+    const html = `<!doctype html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="${finalUrl}">
+${headHtml}
+<style id="__forme_inlined">${css}</style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`;
+
+    return { finalUrl, title, html, inlinedBytes: css.length };
+  } finally {
+    await browser.close();
+  }
+}
+
 export type HtmlCapture = { desktop: Buffer; mobile: Buffer };
 
 /** Render a self-contained HTML document and capture desktop + mobile screenshots. */

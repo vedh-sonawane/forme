@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: "M4 13h6V4H4zM14 21h6v-9h-6zM14 4v5h6V4zM4 21h6v-5H4z" },
+  { href: "/refine", label: "Refine a site", icon: "M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" },
   { href: "/projects", label: "Projects", icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
   { href: "/references", label: "References", icon: "M4 5h16M4 12h16M4 19h10" },
   { href: "/library", label: "Design Library", icon: "M12 3l9 4.5-9 4.5L3 7.5 12 3zM3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5" },
