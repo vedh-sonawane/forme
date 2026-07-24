@@ -53,6 +53,7 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
   const redesign = () => run("redesign", () => api(`/api/projects/${p.id}/redesign`, { method: "POST" }), "Redesign generated & critiqued");
   const improve = () => latestSite && run("improve", () => api(`/api/websites/${latestSite.id}/improve`, { method: "POST" }), "Improvement iteration complete");
   const edit = (instruction: string) => latestSite && run("edit", () => api(`/api/websites/${latestSite.id}/edit`, { method: "POST", body: JSON.stringify({ instruction }) }), "Edit applied");
+  const restore = (versionId: string) => latestSite && run("restore", () => api(`/api/websites/${latestSite.id}/restore`, { method: "POST", body: JSON.stringify({ versionId }) }), "Version restored");
   const approve = () => latestDirection && run("approve", () => api(`/api/directions/${latestDirection.id}/approve`, { method: "POST", body: JSON.stringify({ approved: true }) }), "Direction approved");
   const feedback = (action: string, targetType: string, targetId: string) =>
     run("fb", () => api(`/api/feedback`, { method: "POST", body: JSON.stringify({ projectId: p.id, action, targetType, targetId, category: p.requirements.industry }) }), "Feedback recorded");
@@ -72,6 +73,12 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
           <p className="mt-1 max-w-2xl text-sm text-fg-dim">{p.description || "No description"}</p>
         </div>
         <div className="flex gap-2">
+          {latestSite && (
+            <a className="btn-ghost" href={`/api/projects/${p.id}/export`} title="Download the runnable site + Design DNA as a .zip">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+              Export
+            </a>
+          )}
           {!latestDirection && <button className="btn-ghost" onClick={genDirection} disabled={!!busy}>{busy === "direction" ? <Spinner className="h-4 w-4" /> : null} Generate direction</button>}
           <button className="btn-primary" onClick={genWebsite} disabled={!!busy}>
             {busy === "generate" ? <Spinner className="h-4 w-4" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z" /></svg>}
@@ -253,6 +260,7 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
                       <p className="mt-0.5 line-clamp-2 text-sm text-fg-dim">{v.changeNote}</p>
                     </div>
                     {typeof v.score === "number" && <div className="shrink-0 text-right"><div className="text-lg font-bold" style={{ color: scoreColor(v.score) }}>{Math.round(v.score)}</div><div className="text-[10px] text-muted">score</div></div>}
+                    {!isCurrent && <button className="btn-subtle shrink-0" onClick={() => restore(v.id)} disabled={!!busy} title="Roll back to this version">{busy === "restore" ? <Spinner className="h-4 w-4" /> : null}Restore</button>}
                     <button className="btn-subtle shrink-0" onClick={() => { setSelectedVersionId(v.id); setTab("build"); }}>Open</button>
                   </div>
                 );

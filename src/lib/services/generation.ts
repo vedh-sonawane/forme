@@ -354,3 +354,30 @@ export async function editWebsite(websiteId: string, instruction: string) {
 
   return { versionId: newVersion.id, score: result.score, changed, usedFallback: edited.usedFallback };
 }
+
+// ── Restore: roll back to a past version (append-only, so history is preserved) ────
+export async function restoreVersion(websiteId: string, versionId: string) {
+  const site = await db.generatedWebsite.findUniqueOrThrow({
+    where: { id: websiteId },
+    include: { versions: { orderBy: { version: "desc" } } },
+  });
+  const source = site.versions.find((v) => v.id === versionId);
+  if (!source) throw new Error("Version not found.");
+
+  const nextNum = (site.versions[0]?.version ?? 0) + 1;
+  const restored = await db.websiteVersion.create({
+    data: {
+      websiteId: site.id,
+      version: nextNum,
+      label: `restored v${source.version}`,
+      html: source.html,
+      screenshot: source.screenshot,
+      mobileShot: source.mobileShot,
+      overallScore: source.overallScore,
+      parentVersionId: source.id,
+      changeNote: `Restored from ${source.label || "v" + source.version}.`,
+    },
+  });
+  await db.generatedWebsite.update({ where: { id: site.id }, data: { currentVersionId: restored.id } });
+  return { versionId: restored.id, fromVersion: source.version };
+}
