@@ -78,7 +78,7 @@ export function ReferenceBrowser({ references, collections }: { references: Brow
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((r) => (
-              <Link key={r.id} href={`/references/${r.id}`} className="card-link group overflow-hidden p-0">
+              <Link key={r.id} href={`/references/${r.id}`} className="card group overflow-hidden p-0 transition hover:border-accent/40">
                 <div className="relative aspect-[16/10] overflow-hidden bg-surface-2">
                   {r.thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element

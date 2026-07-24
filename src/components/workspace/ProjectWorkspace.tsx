@@ -94,9 +94,9 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
       {toast && <div className="mb-4 rounded-xl border border-[color:var(--ok)]/30 bg-[color:var(--ok)]/10 px-4 py-2.5 text-sm text-[color:var(--ok)]">{toast}</div>}
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-6 flex gap-1 border-b">
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={cn("relative shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition", tab === t.id ? "text-fg" : "text-fg-dim hover:text-fg")}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={cn("relative px-4 py-2.5 text-sm font-medium transition", tab === t.id ? "text-fg" : "text-fg-dim hover:text-fg")}>
             {t.label}
             {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[color:var(--accent)]" />}
           </button>

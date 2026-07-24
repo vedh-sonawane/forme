@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, Space_Grotesk, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
 export const metadata: Metadata = {
   title: "FORME — Design Intelligence & Website Generation",
   description:
-    "Analyze great design, extract its Design DNA, and generate websites that look intentionally designed — improved through visual critique.",
+    "FORME analyzes world-class design, extracts its Design DNA, and generates websites that look intentionally, expensively designed — refined through visual critique.",
 };
+
+// Set the theme before paint to avoid a flash. Defaults to "ink" (dark premium).
+const themeInit = `(function(){try{var t=localStorage.getItem('forme-theme')||'ink';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','ink');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" data-theme="ink" suppressHydrationWarning className={`${inter.variable} ${display.variable} ${serif.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body>{children}</body>
     </html>
   );

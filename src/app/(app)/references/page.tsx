@@ -24,7 +24,7 @@ export default async function ReferencesPage() {
     db.collection.findMany({ where: { userId }, include: { _count: { select: { references: true } } }, orderBy: { name: "asc" } }),
   ]);
 
-  const serialized: BrowserRef[] = references.map((r) => {
+  const serialized: BrowserRef[] = references.map((r: any) => {
     const dnaRow = r.dnaProfiles[0];
     const style = dnaRow ? DesignDNASchema.parse(parseJSON(dnaRow.profile, {})).style?.primary_style || null : null;
     const thumb =
@@ -40,16 +40,18 @@ export default async function ReferencesPage() {
       hasDna: r.dnaProfiles.length > 0,
       style,
       tags: parseJSON<string[]>(r.tags, []),
-      collectionIds: r.collections.map((c) => c.collectionId),
+      collectionIds: r.collections.map((c: any) => c.collectionId),
       createdAt: r.createdAt.toISOString(),
     };
   });
 
   return (
     <div className="animate-in">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">References</h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-fg-dim">Analyze websites and screenshots. FORME extracts their Design DNA — the reusable principles, not a copy.</p>
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">References</h1>
+          <p className="mt-1 text-sm text-fg-dim">Analyze websites and screenshots. FORME extracts their Design DNA — the reusable principles, not a copy.</p>
+        </div>
       </div>
 
       <AddReference />
@@ -57,7 +59,7 @@ export default async function ReferencesPage() {
       <div className="mt-8">
         <ReferenceBrowser
           references={serialized}
-          collections={collections.map((c) => ({ id: c.id, name: c.name, count: c._count.references }))}
+          collections={collections.map((c: any) => ({ id: c.id, name: c.name, count: c._count.references }))}
         />
       </div>
     </div>

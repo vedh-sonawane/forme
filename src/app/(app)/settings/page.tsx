@@ -17,10 +17,13 @@ export default async function SettingsPage() {
   ]);
 
   const rows: { label: string; value: string; tone?: "ok" | "warn" | "default" | "accent" }[] = [
-    { label: "AI provider", value: provider, tone: aiLive ? "ok" : "warn" },
-    { label: "Vision + reasoning model", value: env.geminiModelPro },
-    { label: "Fast model", value: env.geminiModelFlash },
-    { label: "API key", value: env.geminiApiKey ? "configured" : "missing (using mock)", tone: env.geminiApiKey ? "ok" : "warn" },
+    { label: "Active provider (primary)", value: provider, tone: aiLive ? "ok" : "warn" },
+    { label: "Provider chain", value: "Gemini → Mistral → OpenRouter → mock", tone: "default" },
+    { label: "Gemini key", value: env.geminiApiKey ? "configured" : "missing", tone: env.geminiApiKey ? "ok" : "warn" },
+    { label: "Gemini model", value: env.geminiModelPro, tone: "default" },
+    { label: "Mistral key", value: env.mistralApiKey ? "configured" : "missing", tone: env.mistralApiKey ? "ok" : "warn" },
+    { label: "Mistral model", value: env.mistralTextModels[0] ?? "—", tone: "default" },
+    { label: "OpenRouter key", value: env.openrouterApiKey ? "configured" : "missing", tone: env.openrouterApiKey ? "ok" : "default" },
     { label: "Browser rendering (Playwright)", value: browser.available ? "available" : browser.reason ?? "unavailable", tone: browser.available ? "ok" : "warn" },
     { label: "Database", value: "SQLite (Prisma)", tone: "default" },
     { label: "Storage", value: env.storageDir, tone: "default" },
@@ -28,8 +31,8 @@ export default async function SettingsPage() {
 
   return (
     <div className="animate-in max-w-3xl">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Settings</h1>
-      <p className="mt-1.5 text-sm text-fg-dim">Environment, AI provider, and system status.</p>
+      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+      <p className="mt-1 text-sm text-fg-dim">Environment, AI provider, and system status.</p>
 
       <Card className="mt-6">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-fg-dim">System status</h2>
@@ -43,10 +46,10 @@ export default async function SettingsPage() {
         </div>
       </Card>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:gap-4">
-        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{projects}</div><div className="mt-0.5 text-xs text-muted">projects</div></Card>
-        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{refs}</div><div className="mt-0.5 text-xs text-muted">references</div></Card>
-        <Card><div className="text-2xl font-bold tabular-nums sm:text-3xl">{aiCalls}</div><div className="mt-0.5 text-xs text-muted">AI calls logged</div></Card>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <Card><div className="text-2xl font-bold">{projects}</div><div className="text-xs text-muted">projects</div></Card>
+        <Card><div className="text-2xl font-bold">{refs}</div><div className="text-xs text-muted">references</div></Card>
+        <Card><div className="text-2xl font-bold">{aiCalls}</div><div className="text-xs text-muted">AI calls logged</div></Card>
       </div>
 
       {!aiLive && (

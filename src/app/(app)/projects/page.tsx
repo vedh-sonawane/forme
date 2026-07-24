@@ -26,10 +26,10 @@ export default async function ProjectsPage() {
 
   return (
     <div className="animate-in">
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Projects</h1>
-          <p className="mt-1.5 max-w-2xl text-sm text-fg-dim">Design intelligence workspaces — analyze references, generate, critique, and improve.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
+          <p className="mt-1 text-sm text-fg-dim">Design intelligence workspaces — analyze references, generate, critique, and improve.</p>
         </div>
         <CreateProjectDialog />
       </div>
@@ -46,19 +46,17 @@ export default async function ProjectsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p: any) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="card-link group flex flex-col p-5">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold leading-tight transition-colors group-hover:text-[color:var(--accent)]">{p.name}</h3>
+            <Link key={p.id} href={`/projects/${p.id}`} className="card group p-5 transition hover:border-accent/40 hover:bg-surface-2/40">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold leading-tight group-hover:text-fg">{p.name}</h3>
                 <Badge tone={statusTone[p.status] ?? "default"}>{p.status}</Badge>
               </div>
               <p className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-sm text-fg-dim">{p.description || "No description"}</p>
-              <div className="mt-4 flex items-center gap-2.5 text-xs text-muted">
-                <span className="tabular-nums">{p._count.references} refs</span>
-                <span className="h-1 w-1 rounded-full bg-[color:var(--border)]" />
-                <span className="tabular-nums">{p._count.dnaProfiles} DNA</span>
-                <span className="h-1 w-1 rounded-full bg-[color:var(--border)]" />
-                <span className="tabular-nums">{p._count.generatedSites} builds</span>
-                <span className="ml-auto shrink-0">{timeAgo(p.updatedAt)}</span>
+              <div className="mt-4 flex items-center gap-4 text-xs text-muted">
+                <span>{p._count.references} refs</span>
+                <span>{p._count.dnaProfiles} DNA</span>
+                <span>{p._count.generatedSites} builds</span>
+                <span className="ml-auto">{timeAgo(p.updatedAt)}</span>
               </div>
             </Link>
           ))}
