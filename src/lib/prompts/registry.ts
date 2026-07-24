@@ -106,9 +106,15 @@ Return JSON:
   "design-system-v1": {
     operation: "design-system",
     build: (input: { directionJson: string; brandColors?: string[] }): BuiltPrompt => ({
-      system: `You are a design systems engineer. Turn the DESIGN DIRECTION into concrete design tokens.
-Choose real, coherent hex colors with strong contrast, a real modular type scale, real spacing, radius,
-shadow and motion values. Prefer widely-available Google Fonts. ${JSON_ONLY}`,
+      system: `You are a senior design systems engineer at a premium studio. Turn the DESIGN DIRECTION into
+concrete, EXPENSIVE-looking design tokens. Requirements:
+- Colors: a coherent, high-contrast palette with a confident primary and a distinct accent. Ensure text
+  passes WCAG AA on its background. Prefer rich, slightly desaturated surfaces over pure #fff/#000.
+- Typography: pair a characterful heading font with a clean, legible body font. Choose REAL, widely
+  available Google Fonts. Great premium picks: Space Grotesk, Sora, Clash-like grotesks, Fraunces or
+  Instrument Serif (editorial), Satoshi-like sans, Inter/Geist for body. Give heading weight 700–800.
+- A strong modular type scale with a big jump to display (clamp()), generous spacing (section clamp
+  ~5–9rem), larger radii for a soft premium feel, and layered, soft shadows. ${JSON_ONLY}`,
       user: `Design Direction:\n${input.directionJson}\n${
         input.brandColors?.length ? `Brand colors to respect: ${input.brandColors.join(", ")}\n` : ""
       }
@@ -136,22 +142,41 @@ Return JSON:
   "code-generation-v1": {
     operation: "code-generation",
     build: (input: { requirements: string; directionJson: string; systemCss: string; planJson: string; baseline: string }): BuiltPrompt => ({
-      system: `You are a staff frontend engineer and designer. Generate ONE complete, production-quality,
-responsive HTML document for the website. Rules:
-- Return a SINGLE valid HTML document (<!doctype html> ... </html>). No markdown, no explanation.
-- Use ONLY the provided CSS design tokens (they are injected as :root variables and helper classes).
-- Semantic, accessible HTML (landmarks, alt text, aria where needed, real heading order).
-- Responsive via the provided fluid tokens and CSS grid/flex; must look great on mobile.
-- Reusable, consistent components and spacing. Avoid repetitive AI-generated filler and lorem ipsum —
-  write realistic, specific copy for THIS business.
-- Include subtle scroll-reveal animation using a tiny inline IntersectionObserver script and CSS.
-- Do NOT load external JS libraries or trackers. Google Fonts <link> is allowed.`,
+      system: `You are a world-class art director and staff frontend engineer at a top design studio
+(think Linear, Vercel, Stripe, Framer). You produce websites that look EXPENSIVE and intentional —
+never generic, never "AI-generated". Generate ONE complete, production-quality, responsive HTML document.
+
+NON-NEGOTIABLE OUTPUT RULES:
+- Return a SINGLE valid HTML document (<!doctype html> … </html>). No markdown, no commentary.
+- Use ONLY the provided design tokens/classes (injected :root variables + helper classes). Reuse the
+  premium classes: .container .section .eyebrow .display .grad .lead .btn .btn-primary .btn-ghost .card
+  .glass .icon-tile .bento(.wide/.tall/.full) .mesh .orb .grain .mock .float-card .metric-num .logos .cta-band .reveal.
+- Semantic, accessible HTML: one <h1>, correct heading order, landmarks (header/main/section/footer),
+  alt text, aria labels, focus-visible friendly. Must be flawless from 320px up to desktop.
+- Include the tiny inline IntersectionObserver reveal script; put class="reveal" on entrance elements.
+- Do NOT load external JS libraries/trackers. Google Fonts <link> is allowed.
+
+ART DIRECTION (this is what makes it look premium — do ALL of it):
+- Big, confident editorial typography with a strong scale jump between display and body. Use .grad on
+  a key headline phrase. Generous whitespace and a clear vertical rhythm — let sections breathe.
+- A striking hero: eyebrow chip → oversized headline → concise lead → primary+ghost CTAs → a real
+  product visual (use .mock with floating .float-card stat chips) over a soft gradient .mesh + blurred .orb.
+- Vary the layout: use an asymmetric/bento feature section (.bento with .wide/.tall cells), not a boring
+  3-up grid of identical cards. Add a marquee logo strip, a metrics band in a .glass panel, an editorial
+  testimonial, an elevated pricing table (feature the middle tier), and a gradient .cta-band with .mesh.
+- Soft depth: layered shadows, 1px hairline borders, rounded corners, subtle hover lifts. NO flat blocks
+  of pure solid color as full-bleed backgrounds — prefer gradient meshes and tinted surfaces.
+- Write realistic, specific, on-brand copy for THIS business. Absolutely no lorem ipsum, no "Lorem",
+  no placeholder brackets, no repeated filler sentences.
+
+Aim for something you'd proudly ship to a paying client. Push past "fine" to genuinely beautiful.`,
       user: `Requirements:\n${input.requirements}\n
 Design Direction:\n${input.directionJson}\n
 Page/section plan:\n${input.planJson}\n
-Design system CSS (inject inside <head> and use these variables/classes):\n<style>${input.systemCss}</style>\n
-A valid baseline HTML is provided for reference of structure & class usage — improve on it, keep the design tokens:\n${input.baseline.slice(0, 4000)}\n
-Now output the FULL improved HTML document.`,
+Design system CSS (inject inside <head> verbatim and build with these variables/classes):\n<style>${input.systemCss}</style>\n
+Here is a valid, premium baseline HTML using these classes — MATCH OR EXCEED its polish, keep the token
+system, but improve the composition, copy, and detail. Do not regress to a plainer layout:\n${input.baseline.slice(0, 6000)}\n
+Now output the FULL, more refined HTML document.`,
     }),
   },
 
