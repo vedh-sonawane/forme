@@ -67,9 +67,8 @@ export async function generateWebsiteCode(input: {
     operation: p.operation,
     promptVersion: "code-generation-v1",
     model: "pro",
-    maxOutputTokens: 48000,
+    maxOutputTokens: 32000,
     temperature: 0.85,
-    thinking: false,
     ...p.build({
       requirements: JSON.stringify(input.requirements),
       directionJson: JSON.stringify(input.direction),
@@ -164,9 +163,8 @@ export async function improveWebsiteCode(input: {
     operation: p.operation,
     promptVersion: "website-improvement-v1",
     model: "pro",
-    maxOutputTokens: 40000,
+    maxOutputTokens: 32000,
     temperature: 0.5,
-    thinking: false,
     ...p.build({ html: input.html, issuesJson: JSON.stringify(targeted), systemCss: css }),
   });
 

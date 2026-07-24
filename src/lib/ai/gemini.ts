@@ -67,12 +67,13 @@ export class GeminiProvider implements AiProvider {
         };
       } catch (e) {
         lastError = e instanceof Error ? e.message : String(e);
-        // On a rate-limit, brief pause then try the next (lighter/higher-quota) model.
-        if (isRateLimited(e) && i < models.length - 1) {
-          await new Promise((r) => setTimeout(r, 1500));
+        // Try the next model on ANY error (rate-limit, or a per-model 400 like an
+        // unsupported arg) — a different model may accept the request. Longer pause
+        // for rate-limits so we space out; short pause otherwise.
+        if (i < models.length - 1) {
+          await new Promise((r) => setTimeout(r, isRateLimited(e) ? 1500 : 400));
           continue;
         }
-        // Non-rate error, or the last candidate also failed → give up (caller uses mock).
         break;
       }
     }
