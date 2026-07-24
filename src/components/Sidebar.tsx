@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: "M4 13h6V4H4zM14 21h6v-9h-6zM14 4v5h6V4zM4 21h6v-5H4z" },
@@ -46,17 +47,16 @@ export function Sidebar({ aiLive }: { aiLive: boolean }) {
           })}
         </nav>
 
-        <div className="mt-3 rounded-2xl bg-surface/70 p-3">
-          <div className="flex items-center gap-2">
-            <span className={cn("relative flex h-2 w-2", aiLive ? "text-[color:var(--ok)]" : "text-[color:var(--warn)]")}>
-              <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", aiLive ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]")} />
-              <span className={cn("relative inline-flex h-2 w-2 rounded-full", aiLive ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]")} />
-            </span>
-            <div className="text-xs">
-              <div className="font-medium text-fg">{aiLive ? "Gemini live" : "Dev fallback"}</div>
-              <div className="text-[10px] text-muted">{aiLive ? "Real AI analysis" : "No API key — mock AI"}</div>
-            </div>
+        <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface/70 p-2.5">
+          <span className={cn("relative ml-1 flex h-2 w-2", aiLive ? "text-[color:var(--ok)]" : "text-[color:var(--warn)]")}>
+            <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", aiLive ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]")} />
+            <span className={cn("relative inline-flex h-2 w-2 rounded-full", aiLive ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]")} />
+          </span>
+          <div className="flex-1 text-xs">
+            <div className="font-medium text-fg">{aiLive ? "Gemini live" : "Dev fallback"}</div>
+            <div className="text-[10px] text-muted">{aiLive ? "Real AI analysis" : "No API key — mock AI"}</div>
           </div>
+          <ThemeToggle />
         </div>
       </div>
     </aside>

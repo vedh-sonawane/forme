@@ -43,32 +43,32 @@
 }
 
 [data-theme="ink"] {
-  --bg: #0b0a09;
-  --surface: #141310;
-  --surface-2: #1b1915;
-  --border: #2a2721;
-  --muted: #837d6e;
-  --fg: #f4f0e6;
-  --fg-dim: #b3ab99;
-  --accent: #f4c85b; /* amber lifts on dark */
-  --accent-fg: #16130c;
-  --accent-dim: #33301f;
+  --bg: #08080a;
+  --surface: #121216;
+  --surface-2: #1a1a1f;
+  --border: #26262d;
+  --muted: #797985;
+  --fg: #f5f5f7;
+  --fg-dim: #a2a2ae;
+  --accent: #4f8cff; /* premium blue — matches the analytics reference */
+  --accent-fg: #ffffff;
+  --accent-dim: #1a2540;
   --spark: #f4c85b;
-  --spark-ink: #fff6df;
-  --mint: #6ad3a0;
-  --violet: #a394ff;
-  --danger: #ff6b73;
+  --spark-ink: #16130c;
+  --mint: #46d69f;
+  --violet: #a88bff;
+  --danger: #ff5d67;
   --warn: #f0b23a;
-  --ok: #45c78d;
+  --ok: #46d69f;
 
-  --glass: rgba(24, 22, 18, 0.6);
-  --glass-brd: rgba(255, 255, 255, 0.06);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 20px 50px -24px rgba(0, 0, 0, 0.7);
-  --shadow-pop: 0 40px 90px -30px rgba(0, 0, 0, 0.8);
+  --glass: rgba(20, 20, 26, 0.55);
+  --glass-brd: rgba(255, 255, 255, 0.07);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  --shadow-pop: 0 44px 100px -30px rgba(0, 0, 0, 0.9);
 
-  --mesh-1: rgba(244, 200, 91, 0.14);
-  --mesh-2: rgba(106, 211, 160, 0.12);
-  --mesh-3: rgba(163, 148, 255, 0.14);
+  --mesh-1: rgba(79, 140, 255, 0.16);
+  --mesh-2: rgba(70, 214, 159, 0.12);
+  --mesh-3: rgba(168, 139, 255, 0.16);
   --mesh-4: rgba(255, 255, 255, 0.03);
 }
 
@@ -234,3 +234,85 @@ h1, h2, h3, h4, .font-display {
   to { transform: translateX(-50%); }
 }
 .animate-marquee { animation: marquee 26s linear infinite; }
+
+/* Fine film grain — premium texture, barely visible. Applied to hero/sections. */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* Floating glassmorphism shapes that "radiate" (pulse outward) on a slow cycle. */
+.glass-orb {
+  position: absolute;
+  border-radius: 9999px;
+  background: var(--glass);
+  border: 1px solid var(--glass-brd);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(8px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 50px -20px rgba(0, 0, 0, 0.5);
+  animation: orb-drift var(--dur, 14s) ease-in-out infinite, orb-radiate 4s ease-out infinite;
+}
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(var(--dx, 12px), var(--dy, -18px)); }
+}
+@keyframes orb-radiate {
+  0% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 0 color-mix(in srgb, var(--spark) 45%, transparent); }
+  70% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 26px transparent; }
+  100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 0 transparent; }
+}
+
+/* Glitter: sparkle particles + shimmering gold text when the lighthouse hits a word. */
+.glimmer {
+  background: linear-gradient(92deg, var(--fg) 0%, var(--fg) 40%, #ffe9a8 48%, #fff 50%, #ffe9a8 52%, var(--fg) 60%, var(--fg) 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: glimmer-sweep 2.2s linear infinite;
+  text-shadow: 0 0 22px rgba(255, 216, 130, 0.55);
+}
+@keyframes glimmer-sweep {
+  from { background-position: 160% 0; }
+  to { background-position: -160% 0; }
+}
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+.sparkle { animation: sparkle 1.6s ease-in-out infinite; }
+
+/* Lighthouse beam cone. */
+.beam {
+  transform-origin: left center;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--spark) 70%, transparent), transparent 78%);
+  filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  clip-path: polygon(0 42%, 100% 0, 100% 100%, 0 58%);
+}
+.beam.on { opacity: 0.9; animation: beam-flicker 3.5s ease-in-out infinite; }
+@keyframes beam-flicker {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+/* Ink-spread transition (View Transitions API): new theme wipes in as an ink drop. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2147483646; }
+html[data-theme="ink"]::view-transition-new(root) { animation: ink-spread 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+html[data-theme="paper"]::view-transition-old(root) { z-index: 2147483646; animation: ink-spread 0.9s cubic-bezier(0.16, 1, 0.3, 1) reverse; }
+@keyframes ink-spread {
+  from { clip-path: circle(0% at var(--ink-x, 90%) var(--ink-y, 6%)); }
+  to { clip-path: circle(150% at var(--ink-x, 90%) var(--ink-y, 6%)); }
+}
