@@ -6,7 +6,20 @@ const list = (v: string | undefined, fallback: string[]): string[] => {
 
 export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "file:./dev.db",
-  aiProvider: (process.env.AI_PROVIDER ?? "gemini") as "openrouter" | "gemini" | "mock",
+  aiProvider: (process.env.AI_PROVIDER ?? "gemini") as "mistral" | "openrouter" | "gemini" | "mock",
+
+  // ── Mistral (OpenAI-compatible; free tier is rate-limited, not daily-capped) ──
+  mistralApiKey: process.env.MISTRAL_API_KEY ?? "",
+  mistralTextModels: list(process.env.MISTRAL_TEXT_MODELS, [
+    "mistral-large-latest",
+    "codestral-latest",
+    "mistral-medium-latest",
+  ]),
+  mistralVisionModels: list(process.env.MISTRAL_VISION_MODELS, [
+    "mistral-medium-latest",
+    "pixtral-12b-latest",
+    "mistral-large-latest",
+  ]),
 
   // ── OpenRouter (one API, many free models — cascades when a model is busy) ──
   openrouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
@@ -45,12 +58,18 @@ export const env = {
 
 // Resolve which provider is actually usable, honoring AI_PROVIDER + key availability,
 // and degrading gracefully to the clearly-marked mock provider when no key is present.
-export function resolveProvider(): "openrouter" | "gemini" | "mock" {
-  if (env.aiProvider === "openrouter" && env.openrouterApiKey.trim().length > 0) return "openrouter";
-  if (env.aiProvider === "gemini" && env.geminiApiKey.trim().length > 0) return "gemini";
-  // If a provider is selected but its key is missing, try the other real provider.
-  if (env.openrouterApiKey.trim().length > 0) return "openrouter";
-  if (env.geminiApiKey.trim().length > 0) return "gemini";
+export function resolveProvider(): "mistral" | "openrouter" | "gemini" | "mock" {
+  const hasG = env.geminiApiKey.trim().length > 0;
+  const hasM = env.mistralApiKey.trim().length > 0;
+  const hasOR = env.openrouterApiKey.trim().length > 0;
+  // Honor the explicitly-selected provider when its key is present.
+  if (env.aiProvider === "mistral" && hasM) return "mistral";
+  if (env.aiProvider === "openrouter" && hasOR) return "openrouter";
+  if (env.aiProvider === "gemini" && hasG) return "gemini";
+  // Otherwise fall back to any available real provider (quality order).
+  if (hasG) return "gemini";
+  if (hasM) return "mistral";
+  if (hasOR) return "openrouter";
   return "mock";
 }
 

@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 import { env, resolveProvider } from "@/lib/env";
 import { GeminiProvider } from "./gemini";
 import { OpenRouterProvider } from "./openrouter";
+import { MistralProvider } from "./mistral";
 import { MockProvider } from "./mock";
 import type { AiProvider, GenerateOptions, GenerateResult, AiCallMeta } from "./types";
 
 let _mock: MockProvider | null = null;
 let _gemini: GeminiProvider | null = null;
 let _openrouter: OpenRouterProvider | null = null;
+let _mistral: MistralProvider | null = null;
 
 function mockProvider(): MockProvider {
   if (!_mock) _mock = new MockProvider();
@@ -22,10 +24,15 @@ function openrouterProvider(): OpenRouterProvider {
   if (!_openrouter) _openrouter = new OpenRouterProvider(env.openrouterApiKey);
   return _openrouter;
 }
+function mistralProvider(): MistralProvider {
+  if (!_mistral) _mistral = new MistralProvider(env.mistralApiKey);
+  return _mistral;
+}
 
 /** The single preferred provider (kept for callers that just want "the" provider). */
 export function getProvider(): AiProvider {
   const which = resolveProvider();
+  if (which === "mistral") return mistralProvider();
   if (which === "openrouter") return openrouterProvider();
   if (which === "gemini") return geminiProvider();
   return mockProvider();
@@ -42,14 +49,20 @@ export function usingRealAI(): boolean {
  */
 function providerChain(): AiProvider[] {
   const chain: AiProvider[] = [];
-  const hasGemini = env.geminiApiKey.trim().length > 0;
-  const hasOR = env.openrouterApiKey.trim().length > 0;
+  const has: Record<string, boolean> = {
+    gemini: env.geminiApiKey.trim().length > 0,
+    mistral: env.mistralApiKey.trim().length > 0,
+    openrouter: env.openrouterApiKey.trim().length > 0,
+  };
   const preferred = resolveProvider();
-
-  const order: ("gemini" | "openrouter")[] = preferred === "openrouter" ? ["openrouter", "gemini"] : ["gemini", "openrouter"];
+  // Preferred provider first, then the rest by design-quality order, then mock.
+  const quality = ["gemini", "mistral", "openrouter"];
+  const order = [preferred, ...quality.filter((p) => p !== preferred)];
   for (const name of order) {
-    if (name === "gemini" && hasGemini) chain.push(geminiProvider());
-    if (name === "openrouter" && hasOR) chain.push(openrouterProvider());
+    if (!has[name]) continue;
+    if (name === "gemini") chain.push(geminiProvider());
+    else if (name === "mistral") chain.push(mistralProvider());
+    else if (name === "openrouter") chain.push(openrouterProvider());
   }
   chain.push(mockProvider());
   return chain;
