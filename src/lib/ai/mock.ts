@@ -168,16 +168,40 @@ function designSystem(seed: number) {
   };
 }
 
-function requirements(userText: string) {
+// The requirement-analysis prompt wraps the real idea as: User request:\n"""<idea>"""
+// The mock only receives that built prompt string, so recover the clean idea from it
+// instead of echoing the scaffolding ("User request:", triple quotes) into the brand.
+function extractIdea(promptUser: string): string {
+  const fenced = promptUser.match(/"""([\s\S]*?)"""/);
+  let idea = (fenced ? fenced[1] : promptUser).trim();
+  idea = idea.replace(/^\s*User request:\s*/i, "").replace(/^["'“”]+|["'“”]+$/g, "").trim();
+  return idea;
+}
+
+const BRAND_STOP = new Set([
+  "a", "an", "the", "for", "of", "to", "and", "or", "with", "your", "our", "that", "this",
+  "site", "website", "landing", "page", "web", "app", "application", "platform", "startup",
+  "company", "business", "brand", "builds", "building", "make", "create", "new",
+]);
+
+function deriveBrand(idea: string): string {
+  const words = idea.replace(/[^a-zA-Z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const significant = words.filter((w) => !BRAND_STOP.has(w.toLowerCase()));
+  const chosen = (significant.length ? significant : words).slice(0, 2).map((w) => w[0].toUpperCase() + w.slice(1));
+  return (chosen.join(" ") || "Forme").slice(0, 24);
+}
+
+function requirements(promptUser: string) {
+  const idea = extractIdea(promptUser);
   return {
-    business: userText.slice(0, 160),
-    product: "",
+    business: idea.slice(0, 200),
+    product: deriveBrand(idea),
     industry: "technology",
     target_audience: "early adopters and decision-makers",
     goals: ["communicate value clearly", "drive sign-ups", "establish credibility"],
     tone: ["confident", "clear", "modern"],
     pages: ["Home"],
-    functionality: ["hero", "features", "social proof", "pricing", "CTA"],
+    functionality: ["Fast by default", "Enterprise-grade security", "Real-time analytics", "Seamless integrations", "Effortless setup", "Scales with you"],
     brand_colors: [],
     must_include: [],
     constraints: [],

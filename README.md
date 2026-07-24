@@ -20,7 +20,7 @@ Built to solve the core failure of AI website builders: technically-working but 
 | **Improvement loop** with **regression detection + revert + version history** | ✅ working |
 | **Feedback → PreferenceSignals** (design intelligence dataset foundation) | ✅ working |
 | Reference library, collections, project workspace | ✅ working |
-| Redesign workflow (dedicated original↔proposed UI) | 🚧 backend flag present, UI pending |
+| **Redesign workflow** (original → proposed direction → redesigned, side by side) | ✅ working |
 | Auth (multi-user) | 🚧 single local user; data model is multi-user-ready |
 
 Every AI stage falls back to a **clearly-marked development provider** if the model errors or the free-tier quota is hit, so the app is never broken.
