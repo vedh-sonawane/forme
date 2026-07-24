@@ -43,6 +43,7 @@ export function serializeProject(p: any) {
       direction: DesignDirectionSchema.parse(parseJSON(d.direction, {})),
       systemId: sys?.id ?? null,
       system: sys ? DesignSystemSchema.parse(parseJSON(sys.tokens, {})) : null,
+      model: d.modelMeta ? (parseJSON(d.modelMeta, null) as { provider: string; model: string } | null) : null,
     };
   });
 
@@ -65,6 +66,8 @@ export function serializeProject(p: any) {
         mobileUrl: fileUrl(v.mobileShot),
         parentVersionId: v.parentVersionId,
         critique: crit ? CritiqueSchema.parse(parseJSON(crit.report, {})) : null,
+        critiqueModel: crit?.modelMeta ? (parseJSON(crit.modelMeta, null) as { provider: string; model: string } | null) : null,
+        model: v.modelMeta ? (parseJSON(v.modelMeta, null) as { provider: string; model: string; usedFallback: boolean; source: string } | null) : null,
         createdAt: v.createdAt?.toISOString?.() ?? String(v.createdAt),
       };
     }),

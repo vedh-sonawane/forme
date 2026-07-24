@@ -274,6 +274,8 @@ model WebsiteVersion {
   overallScore Float?
   parentVersionId String? // lineage for regression/revert
   changeNote  String?
+  // Which AI actually produced this version (JSON: provider, model, usedFallback, source).
+  modelMeta   String?
   createdAt   DateTime @default(now())
 
   website     GeneratedWebsite     @relation(fields: [websiteId], references: [id], onDelete: Cascade)

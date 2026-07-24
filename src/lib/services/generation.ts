@@ -122,6 +122,11 @@ async function renderAndCritique(versionId: string, html: string, ctx: { require
 }
 
 // ── Generate a brand-new website (version 1) ──────────────────────────────────────
+// Compact record of which AI actually produced a version (surfaced in the UI).
+function versionMeta(res: { meta: { provider: string; model: string }; usedFallback: boolean; source: string }): string {
+  return toJSON({ provider: res.meta.provider, model: res.meta.model, usedFallback: res.usedFallback, source: res.source });
+}
+
 export async function generateProjectWebsite(projectId: string, directionId?: string) {
   const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
   const requirements = await ensureRequirements(project);
@@ -154,7 +159,7 @@ export async function generateProjectWebsite(projectId: string, directionId?: st
   });
   const htmlPath = await saveText(`sites/html`, `${site.id}-v1.html`, code.html);
   const version = await db.websiteVersion.create({
-    data: { websiteId: site.id, version: 1, label: "v1", html: code.html, changeNote: code.source === "llm" ? "Initial AI generation." : "Initial generation (baseline renderer)." },
+    data: { websiteId: site.id, version: 1, label: "v1", html: code.html, changeNote: code.source === "llm" ? "Initial AI generation." : "Initial generation (baseline renderer).", modelMeta: versionMeta(code) },
   });
   void htmlPath;
 
@@ -226,7 +231,7 @@ export async function redesignProjectWebsite(projectId: string) {
   });
   await saveText(`sites/html`, `${site.id}-v1.html`, code.html);
   const newVersion = await db.websiteVersion.create({
-    data: { websiteId: site.id, version: 1, label: "redesign v1", html: code.html, changeNote: "Redesign preserving brand & content while fixing the original's weaknesses." },
+    data: { websiteId: site.id, version: 1, label: "redesign v1", html: code.html, changeNote: "Redesign preserving brand & content while fixing the original's weaknesses.", modelMeta: versionMeta(code) },
   });
 
   await db.project.update({ where: { id: projectId }, data: { status: "critiquing" } });
@@ -271,6 +276,7 @@ export async function improveWebsite(websiteId: string) {
       html: improved.html,
       parentVersionId: current.id,
       changeNote: improved.changeNote,
+      modelMeta: versionMeta(improved),
     },
   });
   await saveText(`sites/html`, `${site.id}-v${nextVersionNum}.html`, improved.html);
@@ -340,6 +346,7 @@ export async function editWebsite(websiteId: string, instruction: string) {
       html: edited.html,
       parentVersionId: current.id,
       changeNote: `Edit: “${trimmed.slice(0, 160)}”`,
+      modelMeta: versionMeta(edited),
     },
   });
   await saveText(`sites/html`, `${site.id}-v${nextVersionNum}.html`, edited.html);
@@ -378,6 +385,7 @@ export async function restoreVersion(websiteId: string, versionId: string) {
       overallScore: source.overallScore,
       parentVersionId: source.id,
       changeNote: `Restored from ${source.label || "v" + source.version}.`,
+      modelMeta: source.modelMeta,
     },
   });
   await db.generatedWebsite.update({ where: { id: site.id }, data: { currentVersionId: restored.id } });
@@ -392,7 +400,9 @@ export async function generateApplicationBlueprint(projectId: string) {
   const direction = dirRow ? DesignDirectionSchema.parse(parseJSON(dirRow.direction, {})) : null;
 
   const res = await planApplicationBlueprint(requirements, direction);
-  const blueprint = ApplicationBlueprintSchema.parse(res.data);
+  const parsed = ApplicationBlueprintSchema.parse(res.data);
+  // Attach which AI produced it (surfaced in the UI alongside the blueprint).
+  const blueprint = { ...parsed, _model: { provider: res.meta.provider, model: res.meta.model, usedFallback: res.usedFallback } };
   await db.project.update({ where: { id: projectId }, data: { blueprint: toJSON(blueprint) } });
   return { blueprint, usedFallback: res.usedFallback };
 }
