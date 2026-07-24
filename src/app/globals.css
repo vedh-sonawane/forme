@@ -2,97 +2,235 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #08090d;
-  --surface: #0e1016;
-  --surface-2: #14171f;
-  --border: #20242f;
-  --muted: #7b8291;
-  --fg: #eef1f6;
-  --fg-dim: #a3abba;
-  --accent: #7c7bff;
+/* ─────────────────────────────────────────────────────────────────────────────
+   FORME design system — "Paper & Ink"
+   Blended premium: warm cream/butter glass (Crextio) + airy editorial gradient
+   mesh (Fensea). Paper = light (default). Ink = dark. Toggling animates in the
+   settings page. All Tailwind color tokens map to these CSS vars (hex, so the
+   color-mix `/opacity` modifier in tailwind.config keeps working).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="paper"] {
+  --bg: #efece3;
+  --surface: #ffffff;
+  --surface-2: #f6f2e9;
+  --border: #e6e0d2;
+  --muted: #9c9585;
+  --fg: #16150f;
+  --fg-dim: #5b564a;
+  --accent: #141117; /* ink black — primary buttons / nav pill */
   --accent-fg: #ffffff;
-  --accent-dim: #2a2b6b;
-  --danger: #ff5c6c;
-  --warn: #ffb020;
-  --ok: #34d399;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --accent-dim: #ece6d8;
+  --spark: #f4c85b; /* butter amber highlight */
+  --spark-ink: #1a1710;
+  --mint: #8fe0b6;
+  --violet: #b9abff;
+  --danger: #d8474f;
+  --warn: #d38a12;
+  --ok: #2f9e6f;
+
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-brd: rgba(255, 255, 255, 0.7);
+  --shadow-card: 0 1px 2px rgba(20, 17, 15, 0.04), 0 12px 40px -18px rgba(20, 17, 15, 0.22);
+  --shadow-pop: 0 30px 70px -30px rgba(20, 17, 15, 0.4);
+
+  /* mesh tints */
+  --mesh-1: rgba(244, 200, 91, 0.30);
+  --mesh-2: rgba(143, 224, 182, 0.26);
+  --mesh-3: rgba(185, 171, 255, 0.24);
+  --mesh-4: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="ink"] {
+  --bg: #0b0a09;
+  --surface: #141310;
+  --surface-2: #1b1915;
+  --border: #2a2721;
+  --muted: #837d6e;
+  --fg: #f4f0e6;
+  --fg-dim: #b3ab99;
+  --accent: #f4c85b; /* amber lifts on dark */
+  --accent-fg: #16130c;
+  --accent-dim: #33301f;
+  --spark: #f4c85b;
+  --spark-ink: #fff6df;
+  --mint: #6ad3a0;
+  --violet: #a394ff;
+  --danger: #ff6b73;
+  --warn: #f0b23a;
+  --ok: #45c78d;
+
+  --glass: rgba(24, 22, 18, 0.6);
+  --glass-brd: rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 20px 50px -24px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 40px 90px -30px rgba(0, 0, 0, 0.8);
+
+  --mesh-1: rgba(244, 200, 91, 0.14);
+  --mesh-2: rgba(106, 211, 160, 0.12);
+  --mesh-3: rgba(163, 148, 255, 0.14);
+  --mesh-4: rgba(255, 255, 255, 0.03);
 }
 
 * {
   border-color: var(--border);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* Layered gradient mesh — the "no solid colors" backdrop. */
 body {
-  background-image: radial-gradient(60% 40% at 80% -10%, rgba(124, 123, 255, 0.10), transparent 60%),
-    radial-gradient(50% 40% at -10% 0%, rgba(52, 211, 153, 0.06), transparent 55%);
+  min-height: 100vh;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(48% 42% at 12% 8%, var(--mesh-1), transparent 62%),
+    radial-gradient(46% 40% at 88% 4%, var(--mesh-2), transparent 60%),
+    radial-gradient(52% 48% at 92% 88%, var(--mesh-3), transparent 62%),
+    radial-gradient(40% 36% at 30% 100%, var(--mesh-4), transparent 60%);
   background-attachment: fixed;
+  transition: background-color 0.6s ease, color 0.4s ease;
 }
 
 ::selection {
-  background: var(--accent-dim);
-  color: #fff;
+  background: var(--spark);
+  color: var(--spark-ink);
 }
 
 /* Scrollbars */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #23272f;
+  background: color-mix(in srgb, var(--fg) 18%, transparent);
   border-radius: 10px;
-  border: 2px solid var(--bg);
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2d323d;
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
+  background-clip: padding-box;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border bg-surface;
+    @apply rounded-[22px] border bg-surface;
+    box-shadow: var(--shadow-card);
+  }
+  /* Frosted glass surface — the signature look. */
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-brd);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
+    box-shadow: var(--shadow-card);
+    border-radius: 22px;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:brightness-110 shadow-[0_8px_30px_-8px_rgba(124,123,255,0.6)];
+    @apply btn text-[color:var(--accent-fg)];
+    background: var(--accent);
+    box-shadow: 0 10px 30px -10px color-mix(in srgb, var(--accent) 55%, transparent);
   }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+  }
+  .btn-spark {
+    @apply btn text-[color:var(--spark-ink)];
+    background: linear-gradient(135deg, var(--spark), color-mix(in srgb, var(--spark) 70%, #ffffff));
+    box-shadow: 0 12px 34px -12px color-mix(in srgb, var(--spark) 70%, transparent);
+  }
+  .btn-spark:hover { transform: translateY(-1px); filter: brightness(1.04); }
   .btn-ghost {
-    @apply btn border bg-surface text-fg hover:bg-surface-2;
+    @apply btn border bg-surface/70 text-fg backdrop-blur;
   }
+  .btn-ghost:hover { background: var(--surface-2); }
   .btn-subtle {
-    @apply btn text-fg-dim hover:text-fg hover:bg-surface-2;
+    @apply btn text-fg-dim;
   }
+  .btn-subtle:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
   .input {
-    @apply w-full rounded-xl border bg-surface px-3.5 py-2.5 text-sm text-fg placeholder:text-muted outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/20 transition;
+    @apply w-full rounded-2xl border bg-surface/80 px-4 py-2.5 text-sm text-fg placeholder:text-muted outline-none transition;
+  }
+  .input:focus {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
   }
   .label {
     @apply block text-xs font-medium text-fg-dim mb-1.5;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border bg-surface-2 px-2.5 py-1 text-xs text-fg-dim;
+    @apply inline-flex items-center gap-1.5 rounded-full border bg-surface-2/70 px-3 py-1 text-xs text-fg-dim transition;
+  }
+  .chip:hover { color: var(--fg); }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-fg-dim;
   }
   .skeleton {
-    @apply relative overflow-hidden rounded-lg bg-surface-2;
+    @apply relative overflow-hidden rounded-xl bg-surface-2;
   }
   .skeleton::after {
     content: "";
     @apply absolute inset-0 -translate-x-full;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
-    animation: shimmer 1.5s infinite;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 6%, transparent), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+  /* Editorial serif accent for hero words. */
+  .serif {
+    font-family: var(--font-serif);
+    letter-spacing: 0;
   }
 }
 
+/* ── Motion ─────────────────────────────────────────────────────────────────── */
 .animate-in {
-  animation: fade-in 0.35s ease-out both;
+  animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Scroll reveal (used by the marketing homepage). */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  html { scroll-behavior: auto; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(1.5deg); }
+}
+.animate-float { animation: float-slow 8s ease-in-out infinite; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee 26s linear infinite; }

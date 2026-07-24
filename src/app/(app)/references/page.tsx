@@ -24,7 +24,7 @@ export default async function ReferencesPage() {
     db.collection.findMany({ where: { userId }, include: { _count: { select: { references: true } } }, orderBy: { name: "asc" } }),
   ]);
 
-  const serialized: BrowserRef[] = references.map((r) => {
+  const serialized: BrowserRef[] = references.map((r: any) => {
     const dnaRow = r.dnaProfiles[0];
     const style = dnaRow ? DesignDNASchema.parse(parseJSON(dnaRow.profile, {})).style?.primary_style || null : null;
     const thumb =
@@ -40,7 +40,7 @@ export default async function ReferencesPage() {
       hasDna: r.dnaProfiles.length > 0,
       style,
       tags: parseJSON<string[]>(r.tags, []),
-      collectionIds: r.collections.map((c) => c.collectionId),
+      collectionIds: r.collections.map((c: any) => c.collectionId),
       createdAt: r.createdAt.toISOString(),
     };
   });
@@ -59,7 +59,7 @@ export default async function ReferencesPage() {
       <div className="mt-8">
         <ReferenceBrowser
           references={serialized}
-          collections={collections.map((c) => ({ id: c.id, name: c.name, count: c._count.references }))}
+          collections={collections.map((c: any) => ({ id: c.id, name: c.name, count: c._count.references }))}
         />
       </div>
     </div>
