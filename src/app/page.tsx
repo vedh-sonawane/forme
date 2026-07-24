@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Reveal } from "@/components/marketing/Reveal";
+import { GoldenDust } from "@/components/marketing/GoldenDust";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
@@ -70,37 +71,42 @@ function HeroOrbs() {
   );
 }
 
-/* ── Lighthouse with a flashlight toggle that makes "expensively" glitter ────── */
+/* ── Huge lighthouse standing over the title; its beam sweeps across the headline ── */
 function Lighthouse({ lit, onToggle }: { lit: boolean; onToggle: () => void }) {
   return (
-    <div className="pointer-events-none absolute bottom-0 right-2 z-10 select-none sm:right-8 lg:right-16">
-      {/* beam sweeping up-left toward the headline */}
-      <div className={cn("beam absolute bottom-[62%] right-[46%] h-40 w-[60vw] max-w-2xl origin-bottom-right -rotate-[8deg]", lit && "on")} />
-      <div className="relative flex flex-col items-center">
+    <div className="pointer-events-none absolute left-[-1rem] top-6 z-20 select-none sm:left-[1%] lg:left-[4%]">
+      <div className="relative h-[280px] w-[175px] sm:h-[360px] sm:w-[225px] lg:h-[430px] lg:w-[270px]">
+        {/* Beam originates at the lamp (top-center) and fans right across the title. */}
+        <div
+          className={cn("beam-cone absolute", lit && "on")}
+          style={{ left: "52%", top: "13%", width: "130vw", height: "260px", transformOrigin: "left center" }}
+        />
+        {/* Lamp glow */}
+        <div
+          className={cn("lamp-glow absolute", lit && "on")}
+          style={{ left: "50%", top: "13%", width: "120px", height: "120px", transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(255,236,170,0.95), rgba(244,200,91,0.25) 45%, transparent 70%)" }}
+        />
         {/* real vector asset (Iconify · game-icons), not hand-drawn */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://api.iconify.design/game-icons:lighthouse.svg?color=%23f4c85b"
+          src="https://api.iconify.design/game-icons:lighthouse.svg?color=%23e9ddc4"
           alt="Lighthouse"
-          width={92}
-          height={92}
-          className={cn("h-20 w-20 opacity-70 drop-shadow-[0_0_18px_rgba(244,200,91,0.0)] transition-all duration-500 sm:h-24 sm:w-24", lit && "opacity-100 drop-shadow-[0_0_26px_rgba(244,200,91,0.6)]")}
+          className={cn("absolute inset-0 h-full w-full object-contain transition-all duration-500", lit ? "opacity-100 drop-shadow-[0_0_30px_rgba(244,200,91,0.55)]" : "opacity-45")}
         />
+        {/* Light switch at the base */}
         <button
           onClick={onToggle}
           aria-pressed={lit}
-          aria-label="Toggle the lighthouse"
+          aria-label="Toggle the lighthouse light"
+          title={lit ? "Turn the light off" : "Shine the light"}
           className={cn(
-            "pointer-events-auto -mt-3 grid h-9 w-9 place-items-center rounded-full border backdrop-blur transition",
-            lit ? "border-[color:var(--spark)] bg-[color:var(--spark)] text-[color:var(--spark-ink)] shadow-[0_0_24px_rgba(244,200,91,0.6)]" : "bg-surface/70 text-fg-dim hover:text-fg"
+            "pointer-events-auto absolute bottom-1 left-1/2 flex h-8 w-14 -translate-x-1/2 items-center rounded-full border p-1 transition-all",
+            lit ? "justify-end border-[color:var(--spark)] bg-[color:var(--spark)]/25 shadow-[0_0_22px_rgba(244,200,91,0.55)]" : "justify-start bg-surface/80 backdrop-blur"
           )}
-          title="Shine the light"
         >
-          {/* flashlight icon */}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 3h12l-1.5 4.5a2 2 0 0 1-.5 1L14 10v10a2 2 0 0 1-4 0V10L7.9 8.5a2 2 0 0 1-.5-1z" />
-            <path d="M9 3v2M15 3v2" />
-          </svg>
+          <span className={cn("grid h-6 w-6 place-items-center rounded-full transition-all", lit ? "bg-[color:var(--spark)] text-[color:var(--spark-ink)]" : "bg-surface-2 text-fg-dim")}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 21h4M12 2a6 6 0 0 0-3.6 10.8c.5.4.8.9.9 1.5l.2 1.2h5l.2-1.2c.1-.6.4-1.1.9-1.5A6 6 0 0 0 12 2z" /></svg>
+          </span>
         </button>
       </div>
     </div>
@@ -164,16 +170,18 @@ export default function Home() {
       <Nav />
 
       {/* HERO — the only section with floating orbs + grain + lighthouse */}
-      <section className="grain relative overflow-hidden px-4 pb-40 pt-36 sm:pt-44">
+      <section className="grain relative overflow-hidden px-4 pb-40 pt-32 sm:pt-40">
         <HeroOrbs />
-        <Lighthouse lit={lit} onToggle={() => setLit((v) => !v)} />
         {/* warm glow that blooms when lit */}
-        <div aria-hidden className={cn("pointer-events-none absolute left-1/2 top-[42%] -z-10 h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-700", lit ? "opacity-60" : "opacity-0")} style={{ background: "radial-gradient(circle, var(--spark), transparent 60%)" }} />
+        <div aria-hidden className={cn("pointer-events-none absolute left-1/2 top-[38%] -z-10 h-[560px] w-[560px] -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-700", lit ? "opacity-55" : "opacity-0")} style={{ background: "radial-gradient(circle, var(--spark), transparent 60%)" }} />
+        <Lighthouse lit={lit} onToggle={() => setLit((v) => !v)} />
+        {/* golden dust drifting through the beam — in front of the title for depth */}
+        <div className="pointer-events-none absolute inset-0 z-30"><GoldenDust active={lit} /></div>
 
-        <div className="mx-auto max-w-6xl">
+        <div className="relative z-20 mx-auto max-w-6xl">
           <Reveal className="mx-auto max-w-3xl text-center">
             <span className="eyebrow mx-auto">Design intelligence, not templates</span>
-            <h1 className="relative mt-5 font-display text-[clamp(2.6rem,7vw,5.4rem)] font-bold leading-[0.98] tracking-tight">
+            <h1 className={cn("relative mt-5 font-display text-[clamp(2.6rem,7vw,5.4rem)] font-bold leading-[0.98] tracking-tight transition-[text-shadow] duration-700", lit && "[text-shadow:0_0_34px_rgba(244,200,91,0.45)]")}>
               Make vibe-coded sites
               <br className="hidden sm:block" /> look{" "}
               <span className="relative inline-block">
