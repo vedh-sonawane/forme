@@ -22,8 +22,16 @@ Built to solve the core failure of AI website builders: technically-working but 
 | Reference library, collections, project workspace | ✅ working |
 | **Redesign workflow** (original → proposed direction → redesigned, side by side) | ✅ working |
 | **Auth (multi-user)** — email + password, server-side sessions, per-user data scoping | ✅ working |
+| **AI Editor** — edit the site in plain English ("emerald palette", "add pricing", "sticky nav"); edits in place and saves a new version | ✅ working |
+| **Version restore** — append-only rollback to any past version | ✅ working |
+| **Export site** — `.zip` with the runnable `index.html` + Design DNA / system / version history | ✅ working |
+| **AI attribution** — every direction / blueprint / version / edit / critique shows which model made it (Gemini · Mistral · OpenRouter · Mock) | ✅ working |
+| **Application Blueprint** — full-stack plan (entities, relationships, pages, API, auth + roles, env, deployment, testing) before any code | ✅ working |
+| **Export app** — the blueprint becomes a **real, runnable Next.js + Prisma app**: schema, working auth, CRUD pages + REST API, dashboard, your design tokens, and the generated site served at `/` | ✅ **verified: npm install + prisma + next build + runtime CRUD** |
+| **File explorer** — browse the generated app's source in-app (tree + line-numbered viewer) | ✅ working |
+| **One-click deploy to Vercel** — production deploy, live URL, status polling, build logs | 🚧 built; needs a `VERCEL_TOKEN` to verify against the live API |
 
-Every AI stage falls back to a **clearly-marked development provider** if the model errors or the free-tier quota is hit, so the app is never broken.
+Every AI stage falls back through a **provider chain** (Gemini → Mistral → OpenRouter → clearly-marked mock), so a quota stall never breaks the app — and the UI always shows which provider actually produced each artifact.
 
 ---
 
