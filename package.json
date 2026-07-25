@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "playwright:install": "playwright install chromium",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "check:app": "node scripts/check-app.mjs"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",

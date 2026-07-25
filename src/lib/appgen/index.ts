@@ -175,7 +175,17 @@ export default function HomePage() {
 
   // Per-page art direction: the AI's spec when present, otherwise a rotating default
   // so consecutive pages never share a hero/decor/layout.
-  const byRoute = new Map((design?.pages ?? []).map((p) => [(p.route || "").toLowerCase().replace(/\/$/, ""), p]));
+  //
+  // In-app compositions get the same dead-link treatment as the landing page: the model
+  // writes these as standalone HTML too, so any CTA it invents can arrive as href="#"
+  // and silently scroll to the top instead of going anywhere.
+  const appRoutes = [...entityRoutes, { href: "/dashboard", label: "Dashboard" }];
+  const byRoute = new Map(
+    (design?.pages ?? []).map((p) => [
+      (p.route || "").toLowerCase().replace(/\/$/, ""),
+      { ...p, html: retargetMarketingLinks(p.html || "", appRoutes, "/dashboard") },
+    ])
+  );
   const artFor = (route: string, i: number, defaults: { eyebrow: string; headline: string; subcopy: string }): PageArt =>
     resolveArt(byRoute.get(route.toLowerCase()) as unknown as Record<string, string> | undefined, DEFAULT_TREATMENTS[i % DEFAULT_TREATMENTS.length], defaults);
 
