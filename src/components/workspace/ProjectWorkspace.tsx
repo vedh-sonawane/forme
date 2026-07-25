@@ -552,14 +552,16 @@ type DeployRow = { id: string; status: string; url: string | null; inspectorUrl:
 
 function DeployCard({ projectId }: { projectId: string }) {
   const [configured, setConfigured] = useState(true);
+  const [dbReady, setDbReady] = useState(true);
   const [rows, setRows] = useState<DeployRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = async () => {
     try {
-      const d = await api<{ configured: boolean; deployments: DeployRow[] }>(`/api/projects/${projectId}/deploy`);
+      const d = await api<{ configured: boolean; databaseReady: boolean; deployments: DeployRow[] }>(`/api/projects/${projectId}/deploy`);
       setConfigured(d.configured);
+      setDbReady(d.databaseReady);
       setRows(d.deployments);
       return d.deployments;
     } catch {
@@ -602,10 +604,19 @@ function DeployCard({ projectId }: { projectId: string }) {
           <h3 className="text-sm font-semibold">Deploy</h3>
           <p className="mt-1 text-xs text-fg-dim">Ship this generated application to Vercel — production build, live URL.</p>
         </div>
-        <button className="btn-primary" onClick={deploy} disabled={busy || !configured}>
+        <button className="btn-primary" onClick={deploy} disabled={busy || !configured || !dbReady}>
           {busy ? <Spinner className="h-4 w-4" /> : null}{busy ? "Deploying…" : "Deploy to Vercel"}
         </button>
       </div>
+
+      {configured && !dbReady && (
+        <div className="mt-3 rounded-xl border border-[color:var(--warn)]/30 bg-[color:var(--warn)]/10 px-3 py-2 text-xs text-[color:var(--warn)]">
+          <span className="font-medium">A hosted database is required.</span> Serverless hosts have a read-only filesystem, so SQLite can&apos;t persist —
+          sign-up, sign-in and all data would fail at runtime. Set <span className="font-mono">DEPLOY_DATABASE_URL</span> in{" "}
+          <span className="font-mono">.env</span> to a Postgres URL (free: Vercel Postgres, Neon, Supabase) and restart. The deployed copy is then
+          generated with the Postgres provider and its tables are created during the build.
+        </div>
+      )}
 
       {!configured && (
         <div className="mt-3 rounded-xl border border-[color:var(--warn)]/30 bg-[color:var(--warn)]/10 px-3 py-2 text-xs text-[color:var(--warn)]">

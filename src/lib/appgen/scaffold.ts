@@ -28,7 +28,9 @@ export function scaffoldFiles(input: {
         private: true,
         scripts: {
           dev: "next dev",
-          build: "prisma generate && next build",
+          // `db push` during build creates the tables on the deployment target —
+          // without it a hosted app builds fine but every query fails at runtime.
+          build: "prisma generate && prisma db push && next build",
           start: "next start",
           "db:push": "prisma db push",
           "db:studio": "prisma studio",

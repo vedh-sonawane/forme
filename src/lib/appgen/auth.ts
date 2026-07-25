@@ -119,7 +119,8 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true, data: { id: user.id, email: user.email } }, { status: 201 });
     setSessionCookie(res, token, expiresAt);
     return res;
-  } catch {
+  } catch (e) {
+    console.error("[auth/register]", e);
     return NextResponse.json({ ok: false, error: "Could not create the account." }, { status: 500 });
   }
 }
@@ -149,7 +150,8 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true, data: { id: user.id, email: user.email } });
     setSessionCookie(res, token, expiresAt);
     return res;
-  } catch {
+  } catch (e) {
+    console.error("[auth/login]", e);
     return NextResponse.json({ ok: false, error: "Could not sign in." }, { status: 500 });
   }
 }

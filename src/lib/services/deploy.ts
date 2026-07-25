@@ -16,7 +16,22 @@ export async function deployProject(projectId: string): Promise<{ deploymentId: 
     return { error: "Deployment isn't configured. Add VERCEL_TOKEN to .env (create one at vercel.com/account/tokens) and restart." };
   }
 
-  const built = await buildProjectApp(projectId);
+  // A hosted deployment needs a real database: serverless filesystems are read-only,
+  // so a SQLite build deploys "successfully" but every query (sign-up, sign-in, CRUD)
+  // fails at runtime. Refuse rather than ship a broken app.
+  const databaseUrl = env.deployDatabaseUrl.trim();
+  const isPostgres = /^postgres(ql)?:\/\//i.test(databaseUrl);
+  if (!isPostgres) {
+    return {
+      error:
+        "Deploying needs a hosted database. Set DEPLOY_DATABASE_URL in .env to a Postgres URL " +
+        "(free options: Vercel Postgres, Neon, Supabase), then restart. SQLite can't persist on " +
+        "Vercel, so sign-up/sign-in and all data would fail at runtime.",
+    };
+  }
+
+  // Postgres schema for the deployed copy; the .zip export stays SQLite-by-default.
+  const built = await buildProjectApp(projectId, { dbProvider: "postgresql" });
   if ("error" in built) return { error: built.error };
 
   const token = env.vercelToken.trim();
@@ -24,11 +39,6 @@ export async function deployProject(projectId: string): Promise<{ deploymentId: 
 
   const check = await verifyToken(token, teamId);
   if (!check.ok) return { error: `Vercel token rejected: ${check.error ?? "unauthorized"}` };
-
-  // The generated app runs `prisma generate` on install/build, so DATABASE_URL must
-  // exist at build time. SQLite can't persist on Vercel — DEPLOY_DATABASE_URL should
-  // point at managed Postgres for a working database (build succeeds either way).
-  const databaseUrl = env.deployDatabaseUrl.trim() || "file:./dev.db";
 
   const record = await db.deployment.create({
     data: { projectId, provider: "vercel", status: "queued", meta: toJSON({ files: built.files.length, appName: built.appName }) },

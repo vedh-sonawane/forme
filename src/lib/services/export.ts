@@ -106,7 +106,10 @@ export async function exportProject(projectId: string): Promise<{ filename: stri
  * Application Blueprint (Track B): Prisma schema, real auth, CRUD pages + API routes,
  * design tokens, and the generated marketing site served at "/".
  */
-export async function buildProjectApp(projectId: string): Promise<{ slug: string; appName: string; files: { path: string; content: string }[] } | { error: string }> {
+export async function buildProjectApp(
+  projectId: string,
+  opts?: { dbProvider?: "sqlite" | "postgresql" }
+): Promise<{ slug: string; appName: string; files: { path: string; content: string }[] } | { error: string }> {
   const project = await db.project.findUnique({
     where: { id: projectId },
     include: {
@@ -125,7 +128,7 @@ export async function buildProjectApp(projectId: string): Promise<{ slug: string
   const current = site ? site.versions.find((v) => v.id === site.currentVersionId) ?? site.versions[0] ?? null : null;
 
   const { appName, slug } = appIdentity(project.name);
-  const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null });
+  const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null, dbProvider: opts?.dbProvider });
   return { slug, appName, files };
 }
 

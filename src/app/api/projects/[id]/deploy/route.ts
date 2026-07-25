@@ -2,6 +2,7 @@ import { currentUserId } from "@/lib/user";
 import { db } from "@/lib/db";
 import { ok, fail, handler } from "@/lib/api";
 import { deployProject, listDeployments, refreshDeployments, deploymentConfigured } from "@/lib/services/deploy";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -22,6 +23,8 @@ export const GET = handler(async (_req: Request, ctx: Ctx) => {
   const deployments = await listDeployments(id);
   return ok({
     configured: deploymentConfigured(),
+    // A hosted deploy needs Postgres — SQLite can't persist on serverless hosts.
+    databaseReady: /^postgres(ql)?:\/\//i.test(env.deployDatabaseUrl.trim()),
     deployments: deployments.map((d) => ({
       id: d.id,
       status: d.status,

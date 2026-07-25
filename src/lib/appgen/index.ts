@@ -32,8 +32,10 @@ export function buildApplicationFiles(input: {
   blueprint: ApplicationBlueprint;
   system: DesignSystem;
   marketingHtml?: string | null;
+  /** Hosted deployments need Postgres — serverless filesystems can't persist SQLite. */
+  dbProvider?: "sqlite" | "postgresql";
 }): ProjectFile[] {
-  const { appName, slug, blueprint: bp, system } = input;
+  const { appName, slug, blueprint: bp, system, dbProvider = "sqlite" } = input;
   const authRequired = bp.auth?.required === true;
 
   const allModels = planModels(bp, authRequired);
@@ -52,7 +54,7 @@ export function buildApplicationFiles(input: {
 
   files.push(...scaffoldFiles({ appName, slug, bp, system, authRequired, navLinks }));
   files.push(readmeFile({ appName, bp, authRequired, entityRoutes }));
-  files.push({ path: "prisma/schema.prisma", content: renderPrismaSchema(bp, models, authRequired) });
+  files.push({ path: "prisma/schema.prisma", content: renderPrismaSchema(bp, models, authRequired, dbProvider) });
 
   // Marketing site: served verbatim at "/" by a route handler so the generated design
   // is pixel-identical and its global CSS can't leak into the application pages.
