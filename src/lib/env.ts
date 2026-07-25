@@ -51,6 +51,13 @@ export const env = {
     "gemini-flash-lite-latest",
   ]),
 
+  // ── Deployment (Vercel) ──
+  vercelToken: process.env.VERCEL_TOKEN ?? "",
+  vercelTeamId: process.env.VERCEL_TEAM_ID ?? "",
+  // DATABASE_URL handed to the DEPLOYED app (SQLite can't persist on Vercel — set a
+  // managed Postgres URL here for a working database in production).
+  deployDatabaseUrl: process.env.DEPLOY_DATABASE_URL ?? "",
+
   storageDir: process.env.STORAGE_DIR ?? "./storage",
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   disablePlaywright: process.env.DISABLE_PLAYWRIGHT === "1",

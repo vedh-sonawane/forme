@@ -66,6 +66,7 @@ model Project {
   generatedSites   GeneratedWebsite[]
   feedback         UserFeedback[]
   signals          PreferenceSignal[]
+  deployments      Deployment[]
 
   @@index([userId])
   @@index([status])
@@ -355,6 +356,26 @@ model PreferenceSignal {
 
   @@index([signalType])
   @@index([category])
+}
+
+// ── Deployments (generated app → hosting provider) ─────────────────────────────
+model Deployment {
+  id           String   @id @default(cuid())
+  projectId    String
+  provider     String   @default("vercel") // vercel | (future: netlify, cloudflare, …)
+  providerId   String? // deployment id at the provider
+  status       String   @default("queued") // queued | building | ready | error | canceled
+  url          String? // production/preview URL
+  inspectorUrl String? // provider dashboard link (build logs)
+  error        String?
+  meta         String? // JSON: file count, target, provider payload bits
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
 }
 
 // ── AI observability (every model call is logged) ──────────────────────────────

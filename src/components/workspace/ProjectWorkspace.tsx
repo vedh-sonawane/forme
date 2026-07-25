@@ -407,6 +407,94 @@ function BuildTab({
   );
 }
 
+// ── Deploy: ship the generated application to Vercel ──────────────────────────────
+type DeployRow = { id: string; status: string; url: string | null; inspectorUrl: string | null; error: string | null; createdAt: string };
+
+function DeployCard({ projectId }: { projectId: string }) {
+  const [configured, setConfigured] = useState(true);
+  const [rows, setRows] = useState<DeployRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const d = await api<{ configured: boolean; deployments: DeployRow[] }>(`/api/projects/${projectId}/deploy`);
+      setConfigured(d.configured);
+      setRows(d.deployments);
+      return d.deployments;
+    } catch {
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Poll while a build is in flight.
+  useEffect(() => {
+    if (!rows.some((r) => r.status === "queued" || r.status === "building")) return;
+    const t = setInterval(() => void load(), 6000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
+  async function deploy() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/api/projects/${projectId}/deploy`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Deployment failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tone = (s: string) => (s === "ready" ? "ok" : s === "error" || s === "canceled" ? "danger" : "warn") as "ok" | "danger" | "warn";
+
+  return (
+    <div className="card mb-4 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Deploy</h3>
+          <p className="mt-1 text-xs text-fg-dim">Ship this generated application to Vercel — production build, live URL.</p>
+        </div>
+        <button className="btn-primary" onClick={deploy} disabled={busy || !configured}>
+          {busy ? <Spinner className="h-4 w-4" /> : null}{busy ? "Deploying…" : "Deploy to Vercel"}
+        </button>
+      </div>
+
+      {!configured && (
+        <div className="mt-3 rounded-xl border border-[color:var(--warn)]/30 bg-[color:var(--warn)]/10 px-3 py-2 text-xs text-[color:var(--warn)]">
+          Set <span className="font-mono">VERCEL_TOKEN</span> in <span className="font-mono">.env</span> (create one at vercel.com/account/tokens), then restart. Optionally set{" "}
+          <span className="font-mono">DEPLOY_DATABASE_URL</span> to a managed Postgres URL so the deployed app has a working database.
+        </div>
+      )}
+      {err && <div className="mt-3 rounded-xl border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-3 py-2 text-xs text-[color:var(--danger)]">{err}</div>}
+
+      {rows.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {rows.map((d) => (
+            <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2 text-xs">
+              <Badge tone={tone(d.status)}>{d.status}</Badge>
+              {d.url ? (
+                <a href={d.url} target="_blank" rel="noopener noreferrer" className="truncate font-medium text-[color:var(--accent)] hover:underline">{d.url}</a>
+              ) : (
+                <span className="text-muted">building…</span>
+              )}
+              {d.error && <span className="truncate text-[color:var(--danger)]">{d.error}</span>}
+              {d.inspectorUrl && <a href={d.inspectorUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-muted hover:text-fg">Build logs ↗</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Files tab: browse the generated application's source tree ─────────────────────
 type FileEntry = { path: string; size: number };
 
@@ -491,6 +579,7 @@ function FilesTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="animate-in">
+      <DeployCard projectId={projectId} />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">{appName} — generated source</h3>
