@@ -75,10 +75,16 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         </div>
         <div className="flex gap-2">
           {latestSite && (
-            <a className="btn-ghost" href={`/api/projects/${p.id}/export`} title="Download the runnable site + Design DNA as a .zip">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-              Export
-            </a>
+            <>
+              <a className="btn-ghost" href={`/api/projects/${p.id}/export`} title="Download the generated site + Design DNA as a .zip">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                Export site
+              </a>
+              <a className="btn-ghost" href={`/api/projects/${p.id}/export?mode=app`} title="Download a complete, runnable Next.js app generated from the Application Blueprint">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg>
+                Export app
+              </a>
+            </>
           )}
           {!latestDirection && <button className="btn-ghost" onClick={genDirection} disabled={!!busy}>{busy === "direction" ? <Spinner className="h-4 w-4" /> : null} Generate direction</button>}
           <button className="btn-primary" onClick={genWebsite} disabled={!!busy}>

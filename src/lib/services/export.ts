@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { createZip, type ZipFile } from "@/lib/export/zip";
 import { parseJSON } from "@/lib/utils";
+import { ApplicationBlueprintSchema, DesignSystemSchema } from "@/lib/design/schema";
+import { buildApplicationFiles, appIdentity } from "@/lib/appgen";
 
 // Build a downloadable .zip of a project: the runnable site (index.html) plus its
 // Design DNA, direction, design system, and version history + a README. The generated
@@ -97,4 +99,33 @@ export async function exportProject(projectId: string): Promise<{ filename: stri
   }
 
   return { filename: `${name}.zip`, zip: createZip(files) };
+}
+
+/**
+ * Export the project as a COMPLETE, RUNNABLE Next.js application generated from its
+ * Application Blueprint (Track B): Prisma schema, real auth, CRUD pages + API routes,
+ * design tokens, and the generated marketing site served at "/".
+ */
+export async function exportApplication(projectId: string): Promise<{ filename: string; zip: Buffer } | { error: string }> {
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    include: {
+      generatedSites: { orderBy: { updatedAt: "desc" }, include: { versions: { orderBy: { version: "desc" } } } },
+      directions: { orderBy: { version: "desc" }, take: 1, include: { designSystems: { orderBy: { createdAt: "desc" }, take: 1 } } },
+    },
+  });
+  if (!project) return { error: "Project not found." };
+  if (!project.blueprint) return { error: "Generate an Application Blueprint first (App Blueprint tab), then export the app." };
+
+  const blueprint = ApplicationBlueprintSchema.parse(parseJSON(project.blueprint, {}));
+  const systemRow = project.directions[0]?.designSystems[0] ?? null;
+  const system = DesignSystemSchema.parse(systemRow ? parseJSON(systemRow.tokens, {}) : {});
+
+  const site = project.generatedSites[0] ?? null;
+  const current = site ? site.versions.find((v) => v.id === site.currentVersionId) ?? site.versions[0] ?? null : null;
+
+  const { appName, slug } = appIdentity(project.name);
+  const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null });
+
+  return { filename: `${slug}-app.zip`, zip: createZip(files.map((f) => ({ name: f.path, data: f.content }))) };
 }
