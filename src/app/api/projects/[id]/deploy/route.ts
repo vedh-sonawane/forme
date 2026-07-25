@@ -1,7 +1,7 @@
 import { currentUserId } from "@/lib/user";
 import { db } from "@/lib/db";
 import { ok, fail, handler } from "@/lib/api";
-import { deployProject, listDeployments, refreshDeployments, deploymentConfigured } from "@/lib/services/deploy";
+import { deployProject, listDeployments, refreshDeployments, deploymentConfigured, deploymentVerification } from "@/lib/services/deploy";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -25,14 +25,20 @@ export const GET = handler(async (_req: Request, ctx: Ctx) => {
     configured: deploymentConfigured(),
     // A hosted deploy needs Postgres — SQLite can't persist on serverless hosts.
     databaseReady: /^postgres(ql)?:\/\//i.test(env.deployDatabaseUrl.trim()),
-    deployments: deployments.map((d) => ({
-      id: d.id,
-      status: d.status,
-      url: d.url,
-      inspectorUrl: d.inspectorUrl,
-      error: d.error,
-      createdAt: d.createdAt.toISOString(),
-    })),
+    deployments: deployments.map((d) => {
+      const verification = deploymentVerification(d.meta);
+      return {
+        id: d.id,
+        status: d.status,
+        url: d.url,
+        inspectorUrl: d.inspectorUrl,
+        error: d.error,
+        createdAt: d.createdAt.toISOString(),
+        // What a browser actually saw on the live URL after the build went green.
+        checks: verification ? verification.checks : null,
+        checksSkipped: verification?.skipped ?? null,
+      };
+    }),
   });
 });
 

@@ -548,7 +548,17 @@ function AssistantTab({ projectId, canEdit, onApply, busy }: { projectId: string
 }
 
 // ── Deploy: ship the generated application to Vercel ──────────────────────────────
-type DeployRow = { id: string; status: string; url: string | null; inspectorUrl: string | null; error: string | null; createdAt: string };
+type DeployCheck = { name: string; ok: boolean; detail?: string };
+type DeployRow = {
+  id: string;
+  status: string;
+  url: string | null;
+  inspectorUrl: string | null;
+  error: string | null;
+  createdAt: string;
+  checks: DeployCheck[] | null;
+  checksSkipped: string | null;
+};
 
 function DeployCard({ projectId }: { projectId: string }) {
   const [configured, setConfigured] = useState(true);
@@ -574,9 +584,9 @@ function DeployCard({ projectId }: { projectId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  // Poll while a build is in flight.
+  // Poll while a build — or its post-deploy health check — is in flight.
   useEffect(() => {
-    if (!rows.some((r) => r.status === "queued" || r.status === "building")) return;
+    if (!rows.some((r) => r.status === "queued" || r.status === "building" || r.status === "verifying")) return;
     const t = setInterval(() => void load(), 6000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -595,7 +605,8 @@ function DeployCard({ projectId }: { projectId: string }) {
     }
   }
 
-  const tone = (s: string) => (s === "ready" ? "ok" : s === "error" || s === "canceled" ? "danger" : "warn") as "ok" | "danger" | "warn";
+  const tone = (s: string) =>
+    (s === "ready" ? "ok" : s === "error" || s === "canceled" || s === "unhealthy" ? "danger" : "warn") as "ok" | "danger" | "warn";
 
   return (
     <div className="card mb-4 p-5">
@@ -628,18 +639,50 @@ function DeployCard({ projectId }: { projectId: string }) {
 
       {rows.length > 0 && (
         <div className="mt-4 space-y-2">
-          {rows.map((d) => (
-            <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2 text-xs">
-              <Badge tone={tone(d.status)}>{d.status}</Badge>
-              {d.url ? (
-                <a href={d.url} target="_blank" rel="noopener noreferrer" className="truncate font-medium text-[color:var(--accent)] hover:underline">{d.url}</a>
-              ) : (
-                <span className="text-muted">building…</span>
-              )}
-              {d.error && <span className="truncate text-[color:var(--danger)]">{d.error}</span>}
-              {d.inspectorUrl && <a href={d.inspectorUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-muted hover:text-fg">Build logs ↗</a>}
-            </div>
-          ))}
+          {rows.map((d) => {
+            const failing = (d.checks ?? []).filter((c) => !c.ok);
+            return (
+              <div key={d.id} className="rounded-xl border px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge tone={tone(d.status)}>{d.status === "verifying" ? "verifying…" : d.status}</Badge>
+                  {d.url ? (
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" className="truncate font-medium text-[color:var(--accent)] hover:underline">{d.url}</a>
+                  ) : (
+                    <span className="text-muted">building…</span>
+                  )}
+                  {d.status === "ready" && d.checks?.length ? (
+                    <span className="text-[color:var(--ok)]">✓ {d.checks.length} live checks passed</span>
+                  ) : null}
+                  {d.checksSkipped && <span className="text-muted">health check skipped — {d.checksSkipped}</span>}
+                  {d.inspectorUrl && <a href={d.inspectorUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-muted hover:text-fg">Build logs ↗</a>}
+                </div>
+
+                {d.status === "verifying" && (
+                  <p className="mt-1.5 text-muted">Checking the live URL in a real browser — content visibility, text contrast, dead links.</p>
+                )}
+
+                {/* A build that compiles isn't a build that works. If the live page is
+                    broken, say so here rather than presenting a green URL. */}
+                {failing.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 p-2">
+                    <div className="font-medium text-[color:var(--danger)]">
+                      Deployed, but the live app failed {failing.length} check{failing.length === 1 ? "" : "s"}:
+                    </div>
+                    <ul className="mt-1 space-y-0.5">
+                      {failing.slice(0, 6).map((c) => (
+                        <li key={c.name} className="text-[color:var(--danger)]">
+                          • {c.name}
+                          {c.detail ? <span className="text-muted"> — {c.detail}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {failing.length === 0 && d.error && <div className="mt-1.5 truncate text-[color:var(--danger)]">{d.error}</div>}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

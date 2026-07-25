@@ -14,7 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "playwright:install": "playwright install chromium",
     "postinstall": "prisma generate",
-    "check:app": "node scripts/check-app.mjs"
+    "check:app": "tsx scripts/check-app.ts"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",
