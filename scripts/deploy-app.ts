@@ -23,7 +23,7 @@ async function main() {
     if (latest && !["queued", "building", "verifying"].includes(latest.status)) {
       const verification = deploymentVerification(latest.meta);
       for (const c of verification?.checks ?? []) {
-        console.log(`    ${c.ok ? "ok  " : "FAIL"} ${c.name}${c.detail ? ` — ${c.detail}` : ""}`);
+        console.log(`    ${c.ok ? "ok  " : c.severity === "warning" ? "warn" : "FAIL"} ${c.name}${c.detail ? ` — ${c.detail}` : ""}`);
       }
       console.log(JSON.stringify({ status: latest.status, url: latest.url, error: latest.error }));
       if (latest.status !== "ready") process.exitCode = 1;

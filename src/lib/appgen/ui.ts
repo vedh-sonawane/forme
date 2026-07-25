@@ -1,7 +1,7 @@
 import type { DesignSystem } from "@/lib/design/schema";
 import { tokenCss } from "./tokens";
 import { effectsCss } from "./effects";
-import { reconcileTokens } from "./contrast";
+import { reconcileTokens, inkTokens, useInkForText, repairRuleContrast } from "./contrast";
 
 // The generated application's VISUAL layer: a rich, art-directed design system plus a
 // motion runtime. This is what stops the app half of a generated project from looking
@@ -45,7 +45,8 @@ ${tokenCss(s)}
 :root{
   --bg:${c.bg};--surface:${c.surface};--surface-alt:${c.surfaceAlt};
   --text:${c.text};--text-muted:${c.textMuted};--border:${c.border};
-  --primary:${c.primary};--primary-text:${c.primaryText};--accent:${c.accent};
+  --primary:${c.primary};--accent:${c.accent};
+${inkTokens(s)}
   --font-heading:${t.fontHeading};--font-body:${t.fontBody};
   --r-sm:${s.radius.sm};--r-md:${s.radius.md};--r-lg:${s.radius.lg};--r-pill:${s.radius.pill};
   --sh-sm:${s.shadow.sm};--sh-md:${s.shadow.md};--sh-lg:${s.shadow.lg};
@@ -77,7 +78,7 @@ p{color:var(--text-muted)}
 @media(max-width:900px){.g2,.g3,.split{grid-template-columns:1fr}}
 
 /* ── Type scale (dramatic, varied) ──────────────────── */
-.kicker{display:inline-flex;align-items:center;gap:.55rem;font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+.kicker{display:inline-flex;align-items:center;gap:.55rem;font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-ink)}
 .kicker::before{content:"";width:1.7rem;height:1px;background:currentColor;opacity:.7}
 .t-colossal{font-size:clamp(2.8rem,8vw,6.5rem);font-weight:800;line-height:.94;letter-spacing:-.04em}
 .t-display{font-size:clamp(2.1rem,5vw,3.8rem);font-weight:800;line-height:1}
@@ -169,8 +170,8 @@ p{color:var(--text-muted)}
   html{scroll-behavior:auto}
 }
 ${effectsCss()}
-${customCss ? `\n/* ── Brand flourishes (art-directed) ── */\n${customCss}\n` : ""}
-${customCss ? reconcileTokens(customCss, s) : ""}
+${customCss ? `\n/* ── Brand flourishes (art-directed) ── */\n${repairRuleContrast(useInkForText(customCss), s)}\n` : ""}
+${reconcileTokens(customCss, s)}
 `.trim();
 }
 

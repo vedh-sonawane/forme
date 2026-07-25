@@ -129,7 +129,12 @@ ${authRequired ? '              {!user && <Link href="/login" className="muted" 
     // href="#") now have real destinations, so they open the product instead of
     // scrolling back to the top.
     const entry = authRequired ? "/login" : "/dashboard";
-    const linked = retargetMarketingLinks(html, [...entityRoutes, { href: "/dashboard", label: "Dashboard" }], entry);
+    const linked = retargetMarketingLinks(
+      html,
+      [...entityRoutes, { href: "/dashboard", label: "Dashboard" }],
+      entry,
+      authRequired ? "/register" : undefined
+    );
     files.push({
       path: "src/lib/marketing.ts",
       content: `// The website FORME generated for this project, served verbatim at "/".\nexport const MARKETING_HTML = ${JSON.stringify(injectOpenApp(linked, entry))};\n`,

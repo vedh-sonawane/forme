@@ -48,7 +48,8 @@ async function main() {
     process.exit(0);
   }
   for (const c of report.checks) {
-    console.log(`${c.ok ? "  ok  " : " FAIL "} ${c.name}${c.detail ? `  — ${c.detail}` : ""}`);
+    const tag = c.ok ? "  ok  " : c.severity === "warning" ? " warn " : " FAIL ";
+    console.log(`${tag} ${c.name}${c.detail ? `  — ${c.detail}` : ""}`);
   }
   console.log(`\n${summarize(report)}\n`);
   await db.$disconnect().catch(() => {});

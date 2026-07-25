@@ -548,7 +548,7 @@ function AssistantTab({ projectId, canEdit, onApply, busy }: { projectId: string
 }
 
 // ── Deploy: ship the generated application to Vercel ──────────────────────────────
-type DeployCheck = { name: string; ok: boolean; detail?: string };
+type DeployCheck = { name: string; ok: boolean; detail?: string; severity?: "error" | "warning" };
 type DeployRow = {
   id: string;
   status: string;
@@ -640,7 +640,8 @@ function DeployCard({ projectId }: { projectId: string }) {
       {rows.length > 0 && (
         <div className="mt-4 space-y-2">
           {rows.map((d) => {
-            const failing = (d.checks ?? []).filter((c) => !c.ok);
+            const failing = (d.checks ?? []).filter((c) => !c.ok && c.severity !== "warning");
+            const warnings = (d.checks ?? []).filter((c) => !c.ok && c.severity === "warning");
             return (
               <div key={d.id} className="rounded-xl border px-3 py-2 text-xs">
                 <div className="flex flex-wrap items-center gap-3">
@@ -673,6 +674,20 @@ function DeployCard({ projectId }: { projectId: string }) {
                         <li key={c.name} className="text-[color:var(--danger)]">
                           • {c.name}
                           {c.detail ? <span className="text-muted"> — {c.detail}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Quality findings worth seeing, but not worth blocking a deploy over. */}
+                {warnings.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-[color:var(--warn)]/30 bg-[color:var(--warn)]/10 p-2">
+                    <div className="font-medium text-[color:var(--warn)]">{warnings.length} accessibility warning{warnings.length === 1 ? "" : "s"} (not blocking):</div>
+                    <ul className="mt-1 space-y-0.5">
+                      {warnings.slice(0, 4).map((c) => (
+                        <li key={c.name} className="text-[color:var(--warn)]">
+                          • {c.name}{c.detail ? <span className="text-muted"> — {c.detail}</span> : null}
                         </li>
                       ))}
                     </ul>

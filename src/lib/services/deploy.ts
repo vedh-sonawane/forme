@@ -3,13 +3,34 @@ import { env } from "@/lib/env";
 import { toJSON, parseJSON } from "@/lib/utils";
 import { buildProjectApp } from "./export";
 import { createDeployment, getDeploymentStatus, verifyToken } from "@/lib/deploy/vercel";
-import { verifyDeployedApp, summarize, type VerificationReport, type HealthcheckAccount } from "@/lib/verify/deployment";
+import { verifyDeployedApp, summarize, pickPublicUrl, type VerificationReport, type HealthcheckAccount } from "@/lib/verify/deployment";
 
 // Deploy the generated application to a hosting provider. Provider-agnostic shape so
 // Netlify / Cloudflare / Render can be added without changing callers.
 
 export function deploymentConfigured(): boolean {
   return env.vercelToken.trim().length > 0;
+}
+
+/** A safe Postgres schema name: lowercase, unquoted-identifier characters only. */
+function pgIdentifier(slug: string): string {
+  const name = (slug || "app").toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  return (/^[a-z]/.test(name) ? name : `app_${name}`).slice(0, 60) || "generated_app";
+}
+
+/**
+ * Namespace an app's tables inside the shared deployment database by adding
+ * `?schema=<app>` to its connection URL. Prisma creates the schema on first push, so
+ * each generated app owns its own tables and can't collide with — or destroy — another's.
+ */
+export function withAppSchema(url: string, slug: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("schema", pgIdentifier(slug));
+    return u.toString();
+  } catch {
+    return url; // unparseable URL — leave it exactly as the user set it
+  }
 }
 
 export async function deployProject(projectId: string): Promise<{ deploymentId: string; url: string; status: string } | { error: string }> {
@@ -35,6 +56,14 @@ export async function deployProject(projectId: string): Promise<{ deploymentId: 
   const built = await buildProjectApp(projectId, { dbProvider: "postgresql" });
   if ("error" in built) return { error: built.error };
 
+  // Every generated app deploys against the same DEPLOY_DATABASE_URL, and they all want
+  // tables with the same names — User, Session. Sharing one namespace, the second app's
+  // `prisma db push` has to repoint the first app's foreign keys onto its own user model,
+  // which it refuses to do without --accept-data-loss. So the second app could never
+  // deploy, and forcing it through would have destroyed the first app's data. Each app
+  // gets its own Postgres schema inside that database instead.
+  const appDatabaseUrl = withAppSchema(databaseUrl, built.slug);
+
   const token = env.vercelToken.trim();
   const teamId = env.vercelTeamId.trim() || null;
 
@@ -50,7 +79,7 @@ export async function deployProject(projectId: string): Promise<{ deploymentId: 
     teamId,
     name: built.slug,
     files: built.files,
-    env: { DATABASE_URL: databaseUrl, AUTH_SECRET: cryptoRandom() },
+    env: { DATABASE_URL: appDatabaseUrl, AUTH_SECRET: cryptoRandom() },
     production: true,
   });
 
@@ -100,7 +129,7 @@ async function verifyDeployment(deploymentId: string, projectId: string, url: st
     data: {
       status: report.ok ? "ready" : "unhealthy",
       error: report.ok ? null : summarize(report),
-      meta: toJSON({ ...meta, healthcheck: account, verification: report }),
+      meta: toJSON({ ...meta, healthcheck: report.accountUsed ?? account, verification: report }),
     },
   });
 }
@@ -132,15 +161,20 @@ export async function refreshDeployments(projectId: string) {
       continue;
     }
 
+    // Vercel assigns the public production alias moments after the build goes ready, so
+    // the first poll can see only the SSO-protected project URL. Verify — and link the
+    // user to — whichever alias is actually reachable.
+    const publicUrl = (await pickPublicUrl([url, ...(s.aliases ?? [])])) ?? url;
+
     // Claim the verification atomically — the UI polls every few seconds, and the check
     // takes longer than one poll, so without this several requests would run it at once.
     const claimed = await db.deployment.updateMany({
       where: { id: d.id, status: { in: ["queued", "building"] } },
-      data: { status: "verifying", url, error: null },
+      data: { status: "verifying", url: publicUrl, error: null },
     });
     if (claimed.count !== 1) continue;
 
-    await verifyDeployment(d.id, projectId, url).catch(async (e) => {
+    await verifyDeployment(d.id, projectId, publicUrl).catch(async (e) => {
       await db.deployment.update({
         where: { id: d.id },
         data: { status: "ready", error: `Health check could not run: ${e instanceof Error ? e.message : "unknown error"}` },
