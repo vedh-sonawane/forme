@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { createZip, type ZipFile } from "@/lib/export/zip";
-import { parseJSON } from "@/lib/utils";
+import { parseJSON, toJSON } from "@/lib/utils";
 import { ApplicationBlueprintSchema, DesignSystemSchema, DesignDirectionSchema, RequirementsSchema, AppDesignSpecSchema, type AppDesignSpec } from "@/lib/design/schema";
 import { buildApplicationFiles, appIdentity } from "@/lib/appgen";
 import { designApplicationUI } from "@/lib/agents";
@@ -111,7 +111,7 @@ export async function exportProject(projectId: string): Promise<{ filename: stri
  */
 export async function buildProjectApp(
   projectId: string,
-  opts?: { dbProvider?: "sqlite" | "postgresql" }
+  opts?: { dbProvider?: "sqlite" | "postgresql"; redesign?: boolean }
 ): Promise<{ slug: string; appName: string; files: { path: string; content: string }[] } | { error: string }> {
   const project = await db.project.findUnique({
     where: { id: projectId },
@@ -134,10 +134,27 @@ export async function buildProjectApp(
 
   // Art-direct the IN-APP pages with the same AI + direction that made the landing page,
   // so the product doesn't feel like a plain admin bolted onto a beautiful marketing site.
+  //
+  // The result is CACHED on the project. Re-running the model on every export/deploy would
+  // hand back a different-looking product each time — so a bug fix could never be shipped
+  // without also reskinning a design the user had already approved. It's regenerated only
+  // when the art direction moves on, or when a redesign is explicitly requested.
+  const dirRow = project.directions[0] ?? null;
   let design: AppDesignSpec | null = null;
-  try {
-    const dirRow = project.directions[0];
-    if (dirRow) {
+
+  if (!opts?.redesign) {
+    const cached = parseJSON<{ directionId?: string | null; spec?: unknown }>(project.appDesign, {});
+    if (cached.spec && cached.directionId === (dirRow?.id ?? null)) {
+      try {
+        design = AppDesignSpecSchema.parse(cached.spec);
+      } catch {
+        design = null; // stale shape — regenerate below
+      }
+    }
+  }
+
+  if (!design && dirRow) {
+    try {
       const direction = DesignDirectionSchema.parse(parseJSON(dirRow.direction, {}));
       const requirements = RequirementsSchema.parse(parseJSON(project.requirements, {}));
       const routes = [
@@ -149,13 +166,18 @@ export async function buildProjectApp(
       ].join("\n");
       const res = await designApplicationUI(requirements, direction, routes);
       design = AppDesignSpecSchema.parse(res.data);
-      // Swap <img data-image="…"> placeholders for real licensed photography.
+      // Swap <img data-image="…"> placeholders for real licensed photography. Resolved
+      // before caching so redeploys don't re-hit the photo APIs.
       design.pages = await Promise.all(
         design.pages.map(async (p) => ({ ...p, html: await resolveImagePlaceholders(p.html) }))
       );
+      await db.project
+        .update({ where: { id: projectId }, data: { appDesign: toJSON({ directionId: dirRow.id, spec: design }) } })
+        .catch(() => null);
+    } catch {
+      // Art direction is an enhancement — fall back to the rotating defaults.
+      design = null;
     }
-  } catch {
-    // Art direction is an enhancement — fall back to the rotating defaults.
   }
 
   const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null, dbProvider: opts?.dbProvider, design });

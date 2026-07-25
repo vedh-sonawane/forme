@@ -54,6 +54,10 @@ model Project {
   requirements String?
   // Application Blueprint (JSON string): full-stack plan — entities, pages, API, auth, deploy.
   blueprint    String?
+  // Art direction for the IN-APP pages, as {directionId, spec} (JSON string). Cached so a
+  // redeploy rebuilds the same product rather than silently reskinning it; regenerated
+  // when the design direction changes or a redesign is requested.
+  appDesign    String?
   status       String   @default("draft") // draft | researching | directed | generating | critiquing | ready
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

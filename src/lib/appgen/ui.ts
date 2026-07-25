@@ -1,6 +1,7 @@
 import type { DesignSystem } from "@/lib/design/schema";
 import { tokenCss } from "./tokens";
 import { effectsCss } from "./effects";
+import { reconcileTokens } from "./contrast";
 
 // The generated application's VISUAL layer: a rich, art-directed design system plus a
 // motion runtime. This is what stops the app half of a generated project from looking
@@ -169,6 +170,7 @@ p{color:var(--text-muted)}
 }
 ${effectsCss()}
 ${customCss ? `\n/* ── Brand flourishes (art-directed) ── */\n${customCss}\n` : ""}
+${customCss ? reconcileTokens(customCss, s) : ""}
 `.trim();
 }
 
@@ -176,71 +178,84 @@ ${customCss ? `\n/* ── Brand flourishes (art-directed) ── */\n${customCs
 export const MOTION_COMPONENT = `"use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 // Motion runtime for the whole app — reveals, parallax, tilt, count-up, scroll progress.
-// Re-runs on every route change so newly mounted sections animate too.
+//
+// Client-side navigation is the case that bites: the root layout does NOT re-render, and
+// the incoming page only mounts AFTER the outgoing one finishes its exit transition. A
+// one-shot querySelectorAll on mount therefore never sees the new page's elements, which
+// stay at opacity:0 forever — a blank gap exactly where the content should be. So the
+// runtime is keyed to the pathname AND watches for nodes that arrive later.
 export function Motion() {
+  const pathname = usePathname();
+
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const revealables = Array.from(document.querySelectorAll<HTMLElement>(".rv, .stagger"));
+    const fine = window.matchMedia("(pointer:fine)").matches;
+    const bar = document.querySelector<HTMLElement>(".progress");
 
-    if (reduce) {
-      revealables.forEach((el) => el.classList.add("in"));
-    } else {
-      const io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((e) => {
-            if (e.isIntersecting) {
-              e.target.classList.add("in");
-              io.unobserve(e.target);
-            }
-          });
-        },
-        { threshold: 0.12, rootMargin: "0px 0px -6% 0px" }
-      );
-      revealables.forEach((el) => io.observe(el));
-      // Anything already on screen shows immediately.
-      requestAnimationFrame(() => {
-        revealables.forEach((el) => {
-          if (el.getBoundingClientRect().top < window.innerHeight * 0.92) el.classList.add("in");
-        });
-      });
-      // FAILSAFE: never leave content invisible. If the observer misses an element
-      // (late hydration, offscreen-but-short page, resize race), reveal it anyway.
-      var failsafe = window.setTimeout(() => {
-        revealables.forEach((el) => el.classList.add("in"));
-      }, 2000);
-      var cleanupIo = () => { io.disconnect(); window.clearTimeout(failsafe); };
-    }
+    const pending = new Set<HTMLElement>();   // waiting to reveal
+    const counters = new Set<HTMLElement>();  // waiting to count up
+    const parallax = new Set<HTMLElement>();
+    const mouseEls = new Set<HTMLElement>();
+    const tilted = new WeakSet<HTMLElement>();
+    const tiltHandlers: Array<[HTMLElement, (e: MouseEvent) => void, () => void]> = [];
 
-    // Count-up numbers
-    document.querySelectorAll<HTMLElement>("[data-countup]").forEach((el) => {
+    const inView = (el: HTMLElement, ratio: number) => el.getBoundingClientRect().top < window.innerHeight * ratio;
+
+    const countUp = (el: HTMLElement) => {
       const target = parseFloat(el.getAttribute("data-countup") || "0");
       const suffix = el.getAttribute("data-suffix") || "";
       if (reduce) { el.textContent = String(target) + suffix; return; }
-      let started = false;
-      const io2 = new IntersectionObserver((entries) => {
-        entries.forEach((e) => {
-          if (!e.isIntersecting || started) return;
-          started = true;
-          const t0 = performance.now();
-          const step = (now: number) => {
-            const p = Math.min(1, (now - t0) / 1200);
-            el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toString() + suffix;
-            if (p < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-        });
-      }, { threshold: 0.5 });
-      io2.observe(el);
-    });
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - t0) / 1200);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toString() + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
 
-    if (reduce) return () => {};
+    const addTilt = (el: HTMLElement) => {
+      if (tilted.has(el)) return;
+      tilted.add(el);
+      const move = (e: MouseEvent) => {
+        const r = el.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        el.style.transform = \`perspective(900px) rotateY(\${px * 7}deg) rotateX(\${-py * 7}deg) translateY(-4px)\`;
+      };
+      const leave = () => { el.style.transform = ""; };
+      el.style.transition = "transform .35s var(--ease)";
+      el.addEventListener("mousemove", move);
+      el.addEventListener("mouseleave", leave);
+      tiltHandlers.push([el, move, leave]);
+    };
 
-    // Scroll parallax + progress bar
-    const parallax = Array.from(document.querySelectorAll<HTMLElement>("[data-parallax]"));
-    const bar = document.querySelector<HTMLElement>(".progress");
-    const onScroll = () => {
+    // Register an element (and its subtree) with every effect it opts into.
+    const arm = (node: Node) => {
+      if (node.nodeType !== 1) return;
+      const root = node as HTMLElement;
+      const each = (sel: string, fn: (el: HTMLElement) => void) => {
+        if (root.matches(sel)) fn(root);
+        root.querySelectorAll<HTMLElement>(sel).forEach(fn);
+      };
+      each(".rv, .stagger", (el) => { if (!el.classList.contains("in")) pending.add(el); });
+      each("[data-countup]", (el) => counters.add(el));
+      each("[data-parallax]", (el) => parallax.add(el));
+      each("[data-mouse]", (el) => mouseEls.add(el));
+      if (fine) each("[data-tilt]", addTilt);
+    };
+
+    const sweep = () => {
+      pending.forEach((el) => {
+        if (reduce || inView(el, 0.94)) { el.classList.add("in"); pending.delete(el); }
+      });
+      counters.forEach((el) => {
+        if (reduce || inView(el, 0.9)) { counters.delete(el); countUp(el); }
+      });
+      if (reduce) return;
       const y = window.scrollY;
       parallax.forEach((el) => {
         const speed = parseFloat(el.getAttribute("data-parallax") || "0.2");
@@ -251,12 +266,30 @@ export function Motion() {
         bar.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
       }
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
 
-    // Pointer-driven depth + 3D tilt (fine pointers only)
-    const fine = window.matchMedia("(pointer:fine)").matches;
-    const mouseEls = Array.from(document.querySelectorAll<HTMLElement>("[data-mouse]"));
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; sweep(); });
+    };
+
+    arm(document.body);
+    sweep();
+
+    // Anything the router mounts after this effect ran gets armed on arrival.
+    const mo = new MutationObserver((records) => {
+      let touched = false;
+      records.forEach((r) => r.addedNodes.forEach((n) => { arm(n); touched = true; }));
+      if (touched) schedule();
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    // Belt and braces: re-sweep as the page settles (fonts, images, transitions).
+    const timers = [90, 400, 1200, 2600].map((ms) => window.setTimeout(schedule, ms));
+
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+
     const onMove = (e: MouseEvent) => {
       const cx = e.clientX / window.innerWidth - 0.5;
       const cy = e.clientY / window.innerHeight - 0.5;
@@ -265,36 +298,21 @@ export function Motion() {
         el.style.transform = \`translate3d(\${cx * d}px, \${cy * d}px, 0)\`;
       });
     };
-    if (fine && mouseEls.length) window.addEventListener("mousemove", onMove);
-
-    const tilts = Array.from(document.querySelectorAll<HTMLElement>("[data-tilt]"));
-    const tiltHandlers: Array<[HTMLElement, (e: MouseEvent) => void, () => void]> = [];
-    if (fine) {
-      tilts.forEach((el) => {
-        const move = (e: MouseEvent) => {
-          const r = el.getBoundingClientRect();
-          const px = (e.clientX - r.left) / r.width - 0.5;
-          const py = (e.clientY - r.top) / r.height - 0.5;
-          el.style.transform = \`perspective(900px) rotateY(\${px * 7}deg) rotateX(\${-py * 7}deg) translateY(-4px)\`;
-        };
-        const leave = () => { el.style.transform = ""; };
-        el.style.transition = "transform .35s var(--ease)";
-        el.addEventListener("mousemove", move);
-        el.addEventListener("mouseleave", leave);
-        tiltHandlers.push([el, move, leave]);
-      });
-    }
+    if (fine && !reduce) window.addEventListener("mousemove", onMove);
 
     return () => {
-      cleanupIo?.();
-      window.removeEventListener("scroll", onScroll);
+      mo.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+      timers.forEach((t) => window.clearTimeout(t));
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
       window.removeEventListener("mousemove", onMove);
       tiltHandlers.forEach(([el, move, leave]) => {
         el.removeEventListener("mousemove", move);
         el.removeEventListener("mouseleave", leave);
       });
     };
-  });
+  }, [pathname]);
 
   return null;
 }

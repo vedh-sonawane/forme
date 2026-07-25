@@ -6,6 +6,7 @@ import { authFiles } from "./auth";
 import { crudFiles, appLayoutFile, dashboardFile, resolveArt, type PageArt } from "./pages";
 import { appUiCss, MOTION_COMPONENT, TRANSITION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
 import { PARTICLES_COMPONENT } from "./effects";
+import { retargetMarketingLinks } from "./links";
 import { camel, kebabPlural, pascal } from "./naming";
 
 export type { ProjectFile } from "./types";
@@ -74,11 +75,14 @@ export function buildApplicationFiles(input: {
   if ((design?.pages ?? []).some((p) => /fx-particles/.test(p.html || ""))) {
     files.push({ path: "src/components/Particles.tsx", content: PARTICLES_COMPONENT });
   }
+  // The "Sign in" link is only shown to signed-out visitors — otherwise it's a dead end
+  // that bounces straight back to the dashboard.
+  const headerLinks = navLinks.filter((l) => l.href !== "/login");
   files.push({
     path: "src/app/layout.tsx",
     content: `import type { Metadata } from "next";
 import Link from "next/link";
-import { Motion } from "@/components/Motion";
+${authRequired ? 'import { getSessionUser } from "@/lib/auth/session";\n' : ""}import { Motion } from "@/components/Motion";
 import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
@@ -87,8 +91,8 @@ export const metadata: Metadata = {
   description: ${JSON.stringify((bp.summary || appName).slice(0, 200))},
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
+export default ${authRequired ? "async " : ""}function RootLayout({ children }: { children: React.ReactNode }) {
+${authRequired ? "  const user = await getSessionUser().catch(() => null);\n" : ""}  return (
     <html lang="en">
       <body>
         <div className="progress" />
@@ -96,7 +100,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="wrap row" style={{ height: 68, justifyContent: "space-between" }}>
             <Link href="/" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "1.15rem", letterSpacing: "-.02em" }}>${appName}</Link>
             <nav className="row" style={{ gap: "1.4rem" }}>
-${navLinks.map((l) => `              <Link href=${JSON.stringify(l.href)} className="muted" style={{ fontSize: ".88rem", fontWeight: 500 }}>${l.label}</Link>`).join("\n")}
+${headerLinks.map((l) => `              <Link href=${JSON.stringify(l.href)} className="muted" style={{ fontSize: ".88rem", fontWeight: 500 }}>${l.label}</Link>`).join("\n")}
+${authRequired ? '              {!user && <Link href="/login" className="muted" style={{ fontSize: ".88rem", fontWeight: 500 }}>Sign in</Link>}' : ""}
             </nav>
           </div>
         </header>
@@ -120,9 +125,14 @@ ${navLinks.map((l) => `              <Link href=${JSON.stringify(l.href)} classN
   // is pixel-identical and its global CSS can't leak into the application pages.
   const html = (input.marketingHtml || "").trim();
   if (html) {
+    // CTAs the landing page couldn't resolve on its own ("Adopt a recording →" with
+    // href="#") now have real destinations, so they open the product instead of
+    // scrolling back to the top.
+    const entry = authRequired ? "/login" : "/dashboard";
+    const linked = retargetMarketingLinks(html, [...entityRoutes, { href: "/dashboard", label: "Dashboard" }], entry);
     files.push({
       path: "src/lib/marketing.ts",
-      content: `// The website FORME generated for this project, served verbatim at "/".\nexport const MARKETING_HTML = ${JSON.stringify(injectOpenApp(html, authRequired ? "/login" : "/dashboard"))};\n`,
+      content: `// The website FORME generated for this project, served verbatim at "/".\nexport const MARKETING_HTML = ${JSON.stringify(injectOpenApp(linked, entry))};\n`,
     });
     files.push({
       path: "src/app/route.ts",
