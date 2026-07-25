@@ -24,15 +24,62 @@ export function sanitizeMarkup(html: string): string {
  * Returns null when the markup is unusable so the caller falls back to a built-in
  * treatment — creative freedom, but never a broken page.
  */
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr", "path", "circle", "rect", "line", "polygon", "polyline", "stop", "use", "ellipse"]);
+
+/**
+ * True when every element opened in `html` is also closed. Splitting at an unbalanced
+ * point would leave a dangling open tag, which the browser silently auto-closes —
+ * producing an empty container and pushing the real content out of place.
+ */
+export function isBalanced(html: string): boolean {
+  const stack: string[] = [];
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g)) {
+    const [, closing, rawTag, selfClose] = m;
+    const tag = rawTag.toLowerCase();
+    if (VOID_TAGS.has(tag) || selfClose === "/") continue;
+    if (closing) {
+      const i = stack.lastIndexOf(tag);
+      if (i === -1) return false;
+      stack.length = i;
+    } else {
+      stack.push(tag);
+    }
+  }
+  return stack.length === 0;
+}
+
+/**
+ * The AI composes the page; the interactive data component is injected at <!--DATA-->.
+ * The marker is only honoured when the markup before it is balanced — otherwise the
+ * data section is appended after the composition, which is always structurally safe.
+ * Returns null when the markup is unusable so the caller falls back to a built-in
+ * treatment: creative freedom, but never a broken page.
+ */
 export function composedPage(art: PageArt, dataJsx: string): string | null {
   const html = sanitizeMarkup(art.html ?? "");
-  if (html.length < 120 || !html.includes(DATA_MARKER)) return null;
-  const [before, after = ""] = html.split(DATA_MARKER);
-  const block = (s: string) => (s.trim() ? `<div dangerouslySetInnerHTML={{ __html: ${JSON.stringify(s)} }} />` : "");
-  return `<>
+  if (html.length < 120) return null;
+  const block = (s: string) => (s.trim() ? `<div data-composed style={{ position: "relative", display: "flow-root" }} dangerouslySetInnerHTML={{ __html: ${JSON.stringify(s)} }} />` : "");
+
+  if (html.includes(DATA_MARKER)) {
+    const idx = html.indexOf(DATA_MARKER);
+    const before = html.slice(0, idx);
+    const after = html.slice(idx + DATA_MARKER.length);
+    if (isBalanced(before) && isBalanced(after)) {
+      return `<>
       ${block(before)}
       ${dataJsx}
       ${block(after)}
+    </>`;
+    }
+    // Marker sat inside an open element — render the whole composition, then the data.
+    return `<>
+      ${block(html.replace(DATA_MARKER, ""))}
+      ${dataJsx}
+    </>`;
+  }
+  return `<>
+      ${block(html)}
+      ${dataJsx}
     </>`;
 }
 

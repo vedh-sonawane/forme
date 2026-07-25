@@ -338,8 +338,10 @@ COMPOSE EACH PAGE YOURSELF. Do not pick from a menu of stock layouts — write t
 For every page return "html": a real composition (multiple sections if it serves the page) using any
 structure you want — asymmetric and split layouts, bento grids, overlapping/floating elements, magazine
 columns, oversized type, inline SVG artwork, decorative dividers, stat blocks, quotes, illustrated
-panels. It MUST contain the marker <!--DATA--> exactly once, where the app's interactive data component
-(forms, lists, live records) is injected. Everything you write around it is yours to design.
+panels. It MUST contain the marker <!--DATA--> exactly once, at the TOP LEVEL between two sections
+(never inside an open element), where the interactive data component is injected. Every top-level
+section must put its content inside .wrap / .wrap-wide / .wrap-narrow so it is centred — never place
+content directly in a full-bleed section or it will pin to the left edge. Everything you write around it is yours to design.
 
 Available building blocks (already styled — reuse them so pages stay one system):
   layout    .wrap .wrap-wide .wrap-narrow .grid .g2 .g3 .split .stack .row .fx-parent
@@ -372,6 +374,9 @@ Rules for the markup:
   starting kit — if none fits, author your own animated inline SVG / CSS scene in "html" + "css"
   (keyframes, masks, gradients, strokes). Motion must be subtle, purposeful and never hurt readability.
   A restrained brand may use none at all. Never repeat the same effect on every page.
+- Never draw example/placeholder records, rows or cards for the data itself — the real,
+  live records are rendered by the injected data component. Your markup supplies context
+  around it (headers, story, stats, imagery), not a fake copy of the list.
 - Real copy for THIS product. Semantic headings, alt/aria on meaningful elements, keyboard-safe.
 - Mobile first: it must reflow cleanly at 380px — no fixed pixel widths on layout containers.
 

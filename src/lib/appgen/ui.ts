@@ -60,7 +60,11 @@ img,svg{max-width:100%;display:block}
 p{color:var(--text-muted)}
 
 /* ── Layout ─────────────────────────────────────────── */
-.wrap{width:100%;max-width:1180px;margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+/* Each is standalone-complete: used alone they must still centre and pad, otherwise
+   content pins to the left edge. (Never make these modifier-only.) */
+[data-composed]{position:relative;display:flow-root;z-index:0}
+.wrap,.wrap-wide,.wrap-narrow{width:100%;margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.wrap{max-width:1180px}
 .wrap-wide{max-width:1420px}
 .wrap-narrow{max-width:760px}
 .stack{display:grid;gap:clamp(1rem,2.4vw,1.6rem)}
