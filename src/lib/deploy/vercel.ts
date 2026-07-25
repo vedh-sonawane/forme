@@ -11,7 +11,7 @@ export type VercelDeployResult =
   | { ok: false; error: string };
 
 export type VercelStatus =
-  | { ok: true; status: string; url: string | null; ready: boolean; error?: string }
+  | { ok: true; status: string; url: string | null; ready: boolean; error?: string; aliases: string[] }
   | { ok: false; error: string };
 
 function headers(token: string) {
@@ -93,16 +93,21 @@ export async function getDeploymentStatus(token: string, deploymentId: string, t
       headers: headers(token),
     });
     const json = (await res.json().catch(() => null)) as
-      | { readyState?: string; url?: string; errorMessage?: string; error?: { message?: string } }
+      | { readyState?: string; url?: string; errorMessage?: string; alias?: string[]; error?: { message?: string } }
       | null;
     if (!res.ok || !json) return { ok: false, error: json?.error?.message || `Vercel returned ${res.status}` };
     const status = mapState(json.readyState);
+    // The hashed deployment URL is protected by default; the production ALIAS is the
+    // public one. Prefer the shortest alias (e.g. my-app.vercel.app).
+    const aliases = (json.alias ?? []).filter(Boolean).sort((a, b) => a.length - b.length);
+    const best = aliases[0] ?? json.url;
     return {
       ok: true,
       status,
-      url: json.url ? `https://${json.url}` : null,
+      url: best ? `https://${best}` : null,
       ready: status === "ready",
       error: json.errorMessage,
+      aliases,
     };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not reach Vercel." };
