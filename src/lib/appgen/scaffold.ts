@@ -37,9 +37,11 @@ export function scaffoldFiles(input: {
         // Exact pins: generated apps ship without a lockfile, and caret ranges let
         // react / react-dom drift to different patches (react-dom requires an exact
         // matching react), which breaks `npm install` with ERESOLVE.
+        // Next is pinned to a PATCHED 15.x — Vercel refuses to build versions with
+        // known CVEs ("Vulnerable version of Next.js detected").
         dependencies: {
           "@prisma/client": "6.19.3",
-          next: "15.1.6",
+          next: "15.5.21",
           react: "19.2.8",
           "react-dom": "19.2.8",
         },
