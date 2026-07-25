@@ -1,8 +1,10 @@
 import { db } from "@/lib/db";
 import { createZip, type ZipFile } from "@/lib/export/zip";
 import { parseJSON } from "@/lib/utils";
-import { ApplicationBlueprintSchema, DesignSystemSchema } from "@/lib/design/schema";
+import { ApplicationBlueprintSchema, DesignSystemSchema, DesignDirectionSchema, RequirementsSchema, AppDesignSpecSchema, type AppDesignSpec } from "@/lib/design/schema";
 import { buildApplicationFiles, appIdentity } from "@/lib/appgen";
+import { designApplicationUI } from "@/lib/agents";
+import { kebabPlural, pascal } from "@/lib/appgen/naming";
 
 // Build a downloadable .zip of a project: the runnable site (index.html) plus its
 // Design DNA, direction, design system, and version history + a README. The generated
@@ -128,7 +130,30 @@ export async function buildProjectApp(
   const current = site ? site.versions.find((v) => v.id === site.currentVersionId) ?? site.versions[0] ?? null : null;
 
   const { appName, slug } = appIdentity(project.name);
-  const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null, dbProvider: opts?.dbProvider });
+
+  // Art-direct the IN-APP pages with the same AI + direction that made the landing page,
+  // so the product doesn't feel like a plain admin bolted onto a beautiful marketing site.
+  let design: AppDesignSpec | null = null;
+  try {
+    const dirRow = project.directions[0];
+    if (dirRow) {
+      const direction = DesignDirectionSchema.parse(parseJSON(dirRow.direction, {}));
+      const requirements = RequirementsSchema.parse(parseJSON(project.requirements, {}));
+      const routes = [
+        "/dashboard — the signed-in overview, with live counts",
+        ...(blueprint.entities ?? [])
+          .filter((e) => !/^users?$|^account$|^member$/i.test(pascal(e.name)))
+          .slice(0, 6)
+          .map((e) => `/${kebabPlural(pascal(e.name))} — browse and manage ${e.name} records`),
+      ].join("\n");
+      const res = await designApplicationUI(requirements, direction, routes);
+      design = AppDesignSpecSchema.parse(res.data);
+    }
+  } catch {
+    // Art direction is an enhancement — fall back to the rotating defaults.
+  }
+
+  const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null, dbProvider: opts?.dbProvider, design });
   return { slug, appName, files };
 }
 

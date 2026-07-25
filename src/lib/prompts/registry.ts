@@ -313,6 +313,44 @@ ${DNA_SHAPE}`,
     }),
   },
 
+  "app-design-v1": {
+    operation: "app-design",
+    build: (input: { requirements: string; directionJson: string; pages: string }): BuiltPrompt => ({
+      system: `You are art-directing the INSIDE of a product — the signed-in application pages, not the
+marketing landing page. The landing page is already beautiful; the app must feel like the SAME product:
+same art direction, same atmosphere, same quality. A plain CRUD admin bolted onto a beautiful landing
+page is the failure you are preventing.
+
+Give EVERY page its own visual identity. Rules:
+- No two consecutive pages share a hero treatment, decor or layout — vary the rhythm deliberately
+  (some pages colossal and dramatic, some quiet and minimal).
+- Each page gets ONE memorable visual idea (a floating form, a light shaft, a horizon line, a
+  glass slab, an oversized number wall, a drifting shape) — an identity, not just a layout.
+- Motion is part of the design: choose a reveal style per page and never reuse the same one twice in a row.
+- Honor the art direction's atmosphere. A restrained/editorial brand gets structure, type and space —
+  NOT glow and orbs. An immersive brand can use aurora/rays/orbs.
+- Write real, specific copy for THIS product (headline + subcopy per page). No lorem, no "Welcome to your dashboard".
+${JSON_ONLY}`,
+      user: `Product requirements:\n${input.requirements}\n
+Art direction (the landing page follows this — the app MUST match it):\n${input.directionJson}\n
+Application pages to art-direct (route — purpose):\n${input.pages}\n
+Return JSON:
+{"motion_language","signature_visual",
+ "pages":[{"route","hero","decor","motion","layout","eyebrow","headline","subcopy","visual_idea"}],
+ "custom_css"}
+
+Vocabularies (choose per page, vary them):
+- hero: colossal | editorial | split | centered | minimal
+- decor: orbs | mesh | grid | rays | aurora | none
+- motion: stagger | mask | rise | blur | slide
+- layout: cards | magazine | rows | mosaic
+
+custom_css: a small block of extra CSS for brand flourishes that build on the existing tokens
+(--primary, --accent, --surface, --text, --font-heading). It is appended AFTER the base app design
+system, so you may only ADD or override styles — never assume new markup exists. Keep it under 40 lines.`,
+    }),
+  },
+
   "design-assistant-v1": {
     operation: "design-assistant",
     build: (input: { context: string; history: string; message: string }): BuiltPrompt => ({

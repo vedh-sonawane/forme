@@ -19,10 +19,22 @@ function crc32(buf: Buffer): number {
 
 export type ZipFile = { name: string; data: Buffer | string };
 
+/** Encode a Date into DOS time/date fields used by the ZIP format. */
+function dosStamp(d: Date): { time: number; date: number } {
+  const year = Math.max(1980, d.getFullYear());
+  return {
+    time: (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2),
+    date: ((year - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+  };
+}
+
 export function createZip(files: ZipFile[]): Buffer {
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
+  // Real timestamps: a fixed 1980 stamp makes every extracted file look ancient, which
+  // also defeats build caches (a rebuild can skip "old" sources and ship stale output).
+  const { time: dosTime, date: dosDate } = dosStamp(new Date());
 
   for (const f of files) {
     const data = Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data, "utf8");
@@ -34,8 +46,8 @@ export function createZip(files: ZipFile[]): Buffer {
     local.writeUInt16LE(20, 4); // version needed
     local.writeUInt16LE(0, 6); // flags
     local.writeUInt16LE(0, 8); // method: 0 = store
-    local.writeUInt16LE(0, 10); // mod time
-    local.writeUInt16LE(0x21, 12); // mod date (1980-01-01-ish, valid)
+    local.writeUInt16LE(dosTime, 10); // mod time
+    local.writeUInt16LE(dosDate, 12); // mod date
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(data.length, 18); // compressed size
     local.writeUInt32LE(data.length, 22); // uncompressed size
@@ -49,8 +61,8 @@ export function createZip(files: ZipFile[]): Buffer {
     cen.writeUInt16LE(20, 6); // version needed
     cen.writeUInt16LE(0, 8); // flags
     cen.writeUInt16LE(0, 10); // method
-    cen.writeUInt16LE(0, 12); // mod time
-    cen.writeUInt16LE(0x21, 14); // mod date
+    cen.writeUInt16LE(dosTime, 12); // mod time
+    cen.writeUInt16LE(dosDate, 14); // mod date
     cen.writeUInt32LE(crc, 16);
     cen.writeUInt32LE(data.length, 20);
     cen.writeUInt32LE(data.length, 24);

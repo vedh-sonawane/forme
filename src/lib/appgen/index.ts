@@ -1,9 +1,10 @@
-import type { ApplicationBlueprint, DesignSystem } from "@/lib/design/schema";
+import type { ApplicationBlueprint, DesignSystem, AppDesignSpec } from "@/lib/design/schema";
 import type { ProjectFile } from "./types";
 import { planModels, renderPrismaSchema } from "./prisma";
 import { scaffoldFiles, readmeFile } from "./scaffold";
 import { authFiles } from "./auth";
-import { crudFiles, appLayoutFile, dashboardFile } from "./pages";
+import { crudFiles, appLayoutFile, dashboardFile, resolveArt, type PageArt } from "./pages";
+import { appUiCss, MOTION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
 import { camel, kebabPlural, pascal } from "./naming";
 
 export type { ProjectFile } from "./types";
@@ -34,8 +35,10 @@ export function buildApplicationFiles(input: {
   marketingHtml?: string | null;
   /** Hosted deployments need Postgres — serverless filesystems can't persist SQLite. */
   dbProvider?: "sqlite" | "postgresql";
+  /** AI art direction for the IN-APP pages (each page gets its own visual identity). */
+  design?: AppDesignSpec | null;
 }): ProjectFile[] {
-  const { appName, slug, blueprint: bp, system, dbProvider = "sqlite" } = input;
+  const { appName, slug, blueprint: bp, system, dbProvider = "sqlite", design = null } = input;
   const authRequired = bp.auth?.required === true;
 
   const allModels = planModels(bp, authRequired);
@@ -54,6 +57,49 @@ export function buildApplicationFiles(input: {
 
   files.push(...scaffoldFiles({ appName, slug, bp, system, authRequired, navLinks }));
   files.push(readmeFile({ appName, bp, authRequired, entityRoutes }));
+
+  // ── Visual layer: art-directed design system + motion runtime + app shell ──
+  files.push({ path: "src/app/globals.css", content: appUiCss(system, design?.custom_css ?? "") });
+  files.push({ path: "src/components/Motion.tsx", content: MOTION_COMPONENT });
+  files.push({
+    path: "src/app/layout.tsx",
+    content: `import type { Metadata } from "next";
+import Link from "next/link";
+import { Motion } from "@/components/Motion";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: ${JSON.stringify(appName)},
+  description: ${JSON.stringify((bp.summary || appName).slice(0, 200))},
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <div className="progress" />
+        <header className="glass" style={{ position: "sticky", top: 0, zIndex: 60, borderRadius: 0, borderLeft: 0, borderRight: 0, borderTop: 0 }}>
+          <div className="wrap row" style={{ height: 68, justifyContent: "space-between" }}>
+            <Link href="/" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "1.15rem", letterSpacing: "-.02em" }}>${appName}</Link>
+            <nav className="row" style={{ gap: "1.4rem" }}>
+${navLinks.map((l) => `              <Link href=${JSON.stringify(l.href)} className="muted" style={{ fontSize: ".88rem", fontWeight: 500 }}>${l.label}</Link>`).join("\n")}
+            </nav>
+          </div>
+        </header>
+        <main style={{ minHeight: "70vh" }}>{children}</main>
+        <footer style={{ borderTop: "1px solid var(--border)", marginTop: "4rem" }}>
+          <div className="wrap row" style={{ justifyContent: "space-between", paddingBlock: "2.2rem" }}>
+            <span className="muted" style={{ fontSize: ".85rem" }}>© {new Date().getFullYear()} ${appName}</span>
+            <span className="muted" style={{ fontSize: ".85rem" }}>Built with FORME</span>
+          </div>
+        </footer>
+        <Motion />
+      </body>
+    </html>
+  );
+}
+`,
+  });
   files.push({ path: "prisma/schema.prisma", content: renderPrismaSchema(bp, models, authRequired, dbProvider) });
 
   // Marketing site: served verbatim at "/" by a route handler so the generated design
@@ -102,8 +148,28 @@ export default function HomePage() {
   }
 
   files.push(appLayoutFile(authRequired, appName));
-  files.push(dashboardFile(models, authRequired, appName));
-  for (const m of dataModels) files.push(...crudFiles(m, authRequired));
+
+  // Per-page art direction: the AI's spec when present, otherwise a rotating default
+  // so consecutive pages never share a hero/decor/layout.
+  const byRoute = new Map((design?.pages ?? []).map((p) => [(p.route || "").toLowerCase().replace(/\/$/, ""), p]));
+  const artFor = (route: string, i: number, defaults: { eyebrow: string; headline: string; subcopy: string }): PageArt =>
+    resolveArt(byRoute.get(route.toLowerCase()) as unknown as Record<string, string> | undefined, DEFAULT_TREATMENTS[i % DEFAULT_TREATMENTS.length], defaults);
+
+  files.push(
+    dashboardFile(models, authRequired, appName, artFor("/dashboard", 0, { eyebrow: "Overview", headline: `Your ${appName} workspace`, subcopy: "Everything you've created, live from the database." }))
+  );
+
+  dataModels.forEach((m, i) => {
+    const route = `/${kebabPlural(m.name)}`;
+    const label = m.plural.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+    files.push(
+      ...crudFiles(
+        m,
+        authRequired,
+        artFor(route, i + 1, { eyebrow: label, headline: label.charAt(0).toUpperCase() + label.slice(1), subcopy: `Create, browse and manage ${m.name.toLowerCase()} records — stored in your database.` })
+      )
+    );
+  });
 
   return files;
 }

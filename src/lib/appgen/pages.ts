@@ -1,6 +1,97 @@
 import type { ProjectFile } from "./types";
 import type { ModelPlan } from "./prisma";
 import { camel, kebabPlural } from "./naming";
+import { decorMarkup, revealClass, type PageTreatment } from "./ui";
+
+// Art direction for a page, resolved from the AI's App Design Spec (with a safe default).
+export type PageArt = PageTreatment & { eyebrow: string; headline: string; subcopy: string; visualIdea: string };
+
+const HERO_OK = ["colossal", "editorial", "split", "centered", "minimal"];
+const DECOR_OK = ["orbs", "mesh", "grid", "rays", "aurora", "none"];
+const MOTION_OK = ["stagger", "mask", "rise", "blur", "slide"];
+const LAYOUT_OK = ["cards", "magazine", "rows", "mosaic"];
+const pick = <T extends string>(v: string, ok: string[], fallback: T): T => (ok.includes((v || "").toLowerCase()) ? ((v || "").toLowerCase() as T) : fallback);
+
+export function resolveArt(raw: Partial<Record<string, string>> | undefined, fallback: PageTreatment, defaults: { eyebrow: string; headline: string; subcopy: string }): PageArt {
+  return {
+    hero: pick(raw?.hero ?? "", HERO_OK, fallback.hero),
+    decor: pick(raw?.decor ?? "", DECOR_OK, fallback.decor),
+    motion: pick(raw?.motion ?? "", MOTION_OK, fallback.motion),
+    layout: pick(raw?.layout ?? "", LAYOUT_OK, fallback.layout),
+    eyebrow: raw?.eyebrow?.trim() || defaults.eyebrow,
+    headline: raw?.headline?.trim() || defaults.headline,
+    subcopy: raw?.subcopy?.trim() || defaults.subcopy,
+    visualIdea: raw?.visual_idea?.trim() || "",
+  };
+}
+
+const esc = (s: string) => JSON.stringify(String(s ?? ""));
+
+/** A varied, art-directed page header. */
+function heroMarkup(art: PageArt, extra = ""): string {
+  const rv = revealClass(art.motion);
+  const decor = decorMarkup(art.decor);
+  const eyebrow = `<span className="kicker ${rv}">{${esc(art.eyebrow)}}</span>`;
+  const sub = `<p className="t-lead ${rv}" style={{ marginTop: "1rem" }}>{${esc(art.subcopy)}}</p>`;
+
+  if (art.hero === "split") {
+    return `<section className="scene pagehead">
+      ${decor}
+      <div className="wrap pagehead--split">
+        <div>${eyebrow}<h1 className="t-display balance ${rv}" style={{ marginTop: "1.1rem" }}>{${esc(art.headline)}}</h1>${sub}</div>
+        <div className="${rv} rv-scale" data-tilt>
+          <div className="glass" style={{ padding: "1.6rem", display: "grid", gap: ".7rem" }}>
+            <div style={{ height: 10, width: "55%", borderRadius: 99, background: "color-mix(in srgb, var(--primary) 55%, transparent)" }} />
+            <div style={{ height: 8, width: "85%", borderRadius: 99, background: "color-mix(in srgb, var(--text) 12%, transparent)" }} />
+            <div style={{ height: 8, width: "70%", borderRadius: 99, background: "color-mix(in srgb, var(--text) 12%, transparent)" }} />
+            <div style={{ height: 120, borderRadius: "var(--r-md)", background: "linear-gradient(135deg, color-mix(in srgb, var(--primary) 40%, transparent), color-mix(in srgb, var(--accent) 34%, transparent))" }} />
+          </div>
+        </div>
+      </div>
+      ${extra}
+    </section>`;
+  }
+  if (art.hero === "colossal") {
+    return `<section className="scene pagehead">
+      ${decor}
+      <div className="wrap">${eyebrow}
+        <h1 className="t-colossal balance ${rv}" style={{ marginTop: "1.2rem", maxWidth: "16ch" }}>{${esc(art.headline)}}</h1>${sub}
+      </div>
+      ${extra}
+    </section>`;
+  }
+  if (art.hero === "centered") {
+    return `<section className="scene pagehead" style={{ textAlign: "center" }}>
+      ${decor}
+      <div className="wrap-narrow">${eyebrow}
+        <h1 className="t-display balance ${rv}" style={{ marginTop: "1.1rem" }}>{${esc(art.headline)}}</h1>
+        <p className="t-lead ${rv}" style={{ marginTop: "1rem", marginInline: "auto" }}>{${esc(art.subcopy)}}</p>
+      </div>
+      ${extra}
+    </section>`;
+  }
+  if (art.hero === "minimal") {
+    return `<section className="scene pagehead pagehead--minimal">
+      ${decor}
+      <div className="wrap row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>${eyebrow}<h1 className="t-title ${rv}" style={{ marginTop: ".6rem" }}>{${esc(art.headline)}}</h1></div>
+        <p className="muted ${rv}" style={{ fontSize: ".9rem", maxWidth: "38ch" }}>{${esc(art.subcopy)}}</p>
+      </div>
+      ${extra}
+    </section>`;
+  }
+  // editorial
+  return `<section className="scene pagehead">
+    ${decor}
+    <div className="wrap">
+      <div style={{ maxWidth: "46rem" }}>${eyebrow}
+        <h1 className="t-display balance ${rv}" style={{ marginTop: "1.1rem" }}>{${esc(art.headline)}}</h1>${sub}
+      </div>
+      <hr className="hairline ${rv}" style={{ marginTop: "2.4rem" }} />
+    </div>
+    ${extra}
+  </section>`;
+}
 
 // Page + API generators. Everything is emitted with LITERAL field names (resolved at
 // generation time) so the generated project type-checks under `strict` — no dynamic
@@ -34,7 +125,7 @@ function coercion(f: F): string {
   return `    const ${f.name} = typeof ${src} === "string" && ${src}.trim() ? ${src}.trim() : null;`;
 }
 
-export function crudFiles(m: ModelPlan, authRequired: boolean): ProjectFile[] {
+export function crudFiles(m: ModelPlan, authRequired: boolean, art: PageArt): ProjectFile[] {
   const delegate = camel(m.name);
   const route = kebabPlural(m.name);
   const comp = `${m.name}Manager`;
@@ -53,14 +144,18 @@ ${authRequired ? '  const user = await getSessionUser();\n  if (!user) redirect(
   const initial = rows.map((r) => (${rowMapper(fields)}));
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">${labelOf({ name: m.plural, type: "String" } as F)}</h1>
-      <p className="mt-1 text-sm text-muted">Create, view and remove ${m.name.toLowerCase()} records — stored in the database.</p>
-      <${comp} initial={initial} />
-    </div>
+    <>
+      ${heroMarkup(art)}
+      <section className="wrap" style={{ paddingBottom: "clamp(3rem,8vw,6rem)" }}>
+        <${comp} initial={initial} />
+      </section>
+    </>
   );
 }
 `;
+
+  const collectionClass = art.layout === "rows" ? "stack" : art.layout === "mosaic" ? "mosaic" : art.layout === "magazine" ? "magazine" : "grid g3";
+  const itemClass = art.layout === "rows" ? "rowitem" : "card";
 
   const manager = `"use client";
 
@@ -105,17 +200,21 @@ export function ${comp}({ initial }: { initial: ${m.name}Row[] }) {
     if (!res.ok) setRows(previous);
   }
 
+
   return (
-    <div className="mt-6 space-y-6">
-      <form onSubmit={create} className="card">
-        <h2 className="text-sm font-semibold">New ${m.name.toLowerCase()}</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+    <div className="stack" style={{ gap: "clamp(1.6rem,4vw,2.8rem)" }}>
+      <form onSubmit={create} className="glass rv" style={{ padding: "clamp(1.3rem,3vw,2rem)" }} data-tilt>
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <h2 className="t-title">New ${m.name.toLowerCase()}</h2>
+          <span className="tag">{rows.length} saved</span>
+        </div>
+        <div className="grid g2" style={{ marginTop: "1.4rem" }}>
 ${fields
   .map((f) =>
     f.type === "Boolean"
-      ? `          <label className="flex items-center gap-2 text-sm">
+      ? `          <label className="row" style={{ gap: ".6rem", cursor: "pointer" }}>
             <input type="checkbox" checked={form.${f.name}} onChange={(e) => setForm({ ...form, ${f.name}: e.target.checked })} />
-            ${labelOf(f)}
+            <span>${labelOf(f)}</span>
           </label>`
       : `          <div>
             <label className="label" htmlFor="${f.name}">${labelOf(f)}</label>
@@ -124,27 +223,35 @@ ${fields
   )
   .join("\n")}
         </div>
-        {error && <p className="mt-3 text-sm" style={{ color: "#e5484d" }}>{error}</p>}
-        <button type="submit" className="btn-primary mt-4" disabled={busy}>{busy ? "Saving…" : "Add ${m.name.toLowerCase()}"}</button>
+        {error && <p style={{ marginTop: ".9rem", color: "#e5484d", fontSize: ".9rem" }}>{error}</p>}
+        <button type="submit" className="btn btn-primary" style={{ marginTop: "1.4rem" }} disabled={busy}>
+          {busy ? "Saving…" : "Add ${m.name.toLowerCase()}"}
+        </button>
       </form>
 
       {rows.length === 0 ? (
-        <div className="card text-sm text-muted">Nothing here yet — add your first ${m.name.toLowerCase()} above.</div>
+        <div className="empty rv">
+          <div className="empty-art" />
+          <h3 className="t-title" style={{ marginTop: ".6rem" }}>Nothing here yet</h3>
+          <p className="muted" style={{ maxWidth: "34ch" }}>Add your first ${m.name.toLowerCase()} above and it appears here instantly.</p>
+        </div>
       ) : (
-        <ul className="space-y-2">
+        <div className="${collectionClass} stagger">
           {rows.map((r) => (
-            <li key={r.id} className="card flex items-center justify-between gap-4 py-4">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{${first.type === "Boolean" ? `r.${first.name} ? "Yes" : "No"` : `String(r.${first.name} ?? "")`} || "Untitled"}</div>
+            <article key={r.id} className="${itemClass}">
+              <div style={{ minWidth: 0 }}>
+                <h3 className="t-title" style={{ fontSize: "1.15rem" }}>{${first.type === "Boolean" ? `r.${first.name} ? "Yes" : "No"` : `String(r.${first.name} ?? "")`} || "Untitled"}</h3>
+                <div style={{ marginTop: ".55rem", display: "grid", gap: ".25rem" }}>
 ${fields
   .slice(1)
-  .map((f) => `                <div className="text-xs text-muted">${labelOf(f)}: {${f.type === "Boolean" ? `r.${f.name} ? "Yes" : "No"` : `String(r.${f.name} ?? "—")`}}</div>`)
+  .map((f) => `                  <div className="muted" style={{ fontSize: ".82rem" }}><span style={{ opacity: .7 }}>${labelOf(f)}:</span> {${f.type === "Boolean" ? `r.${f.name} ? "Yes" : "No"` : `String(r.${f.name} ?? "—")`}}</div>`)
   .join("\n")}
+                </div>
               </div>
-              <button className="btn-ghost shrink-0" onClick={() => remove(r.id)}>Delete</button>
-            </li>
+              <button className="btn btn-ghost" style={{ marginTop: "${art.layout === "rows" ? "0" : "1.2rem"}", flexShrink: 0 }} onClick={() => remove(r.id)}>Delete</button>
+            </article>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
@@ -203,7 +310,7 @@ export function appLayoutFile(authRequired: boolean, appName: string): ProjectFi
     return {
       path: "src/app/(app)/layout.tsx",
       content: `export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <div>{children}</div>;
+  return <>{children}</>;
 }
 `,
     };
@@ -218,20 +325,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser();
   if (!user) redirect("/login");
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between gap-4 rounded-2xl border bg-surface px-4 py-3">
-        <span className="text-sm text-muted">Signed in to ${appName} as <span className="font-medium text-fg">{user.email}</span></span>
-        <SignOutButton />
+    <>
+      <div className="wrap" style={{ paddingTop: "1.2rem" }}>
+        <div className="glass rv" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", padding: ".85rem 1.2rem" }}>
+          <span className="muted" style={{ fontSize: ".86rem" }}>
+            Signed in to ${appName} as <strong style={{ color: "var(--text)" }}>{user.email}</strong>
+          </span>
+          <SignOutButton />
+        </div>
       </div>
       {children}
-    </div>
+    </>
   );
 }
 `,
   };
 }
 
-export function dashboardFile(models: ModelPlan[], authRequired: boolean, appName: string): ProjectFile {
+export function dashboardFile(models: ModelPlan[], authRequired: boolean, appName: string, art: PageArt): ProjectFile {
   const data = models.filter((m) => !m.isUser);
   const scope = authRequired ? "{ where: { ownerId: user.id } }" : "";
   const counts = data.map((m) => `    db.${camel(m.name)}.count(${scope})`).join(",\n");
@@ -252,20 +363,24 @@ ${counts},
         : ""
     }
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-      <p className="mt-1 text-sm text-muted">Everything in ${appName} at a glance.</p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <>
+      ${heroMarkup(art)}
+      <section className="wrap" style={{ paddingBottom: "clamp(3rem,8vw,6rem)" }}>
+        <div className="grid g3 stagger">
 ${data
   .map(
-    (m) => `        <Link href="/${kebabPlural(m.name)}" className="card transition hover:border-accent">
-          <div className="text-3xl font-bold">{${camel(m.name)}Count}</div>
-          <div className="mt-1 text-sm text-muted">${m.plural}</div>
-        </Link>`
+    (m) => `          <Link href="/${kebabPlural(m.name)}" className="card" data-tilt style={{ display: "block" }}>
+            <div className="stat-num" data-countup={${camel(m.name)}Count}>{${camel(m.name)}Count}</div>
+            <div className="row" style={{ justifyContent: "space-between", marginTop: ".9rem" }}>
+              <span style={{ fontWeight: 600 }}>${m.plural}</span>
+              <span className="muted" style={{ fontSize: ".8rem" }}>View →</span>
+            </div>
+          </Link>`
   )
   .join("\n")}
-      </div>
-    </div>
+        </div>
+      </section>
+    </>
   );
 }
 `,

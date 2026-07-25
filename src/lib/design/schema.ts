@@ -276,6 +276,32 @@ export const ApplicationBlueprintSchema = z.object({
 });
 export type ApplicationBlueprint = z.infer<typeof ApplicationBlueprintSchema>;
 
+// ── APP DESIGN SPEC (art direction for the APPLICATION, not just the landing page) ──
+// The AI directs each in-app page's visual identity; the generator renders it. Only
+// class/variant choices + CSS come from the model, so a bad choice degrades the look
+// but can never break the build.
+export const AppPageDesignSchema = z.object({
+  route: str, // "/dashboard", "/species", …
+  hero: str, // colossal | editorial | split | centered | minimal
+  decor: str, // orbs | mesh | grid | rays | aurora | none
+  motion: str, // stagger | mask | rise | blur | slide
+  layout: str, // cards | magazine | rows | mosaic
+  eyebrow: str,
+  headline: str,
+  subcopy: str,
+  visual_idea: str, // the ONE memorable visual idea for this page
+});
+
+export const AppDesignSpecSchema = z.object({
+  motion_language: str,
+  signature_visual: str,
+  pages: z.array(AppPageDesignSchema).default([]),
+  /** Extra brand-specific CSS appended after the base app design system. */
+  custom_css: str,
+});
+export type AppDesignSpec = z.infer<typeof AppDesignSpecSchema>;
+export type AppPageDesign = z.infer<typeof AppPageDesignSchema>;
+
 // ── REQUIREMENTS ────────────────────────────────────────────────────────────────
 export const RequirementsSchema = z.object({
   business: str,

@@ -429,6 +429,38 @@ function assistantReply(promptUser: string): string {
     .join("\n");
 }
 
+// Deterministic app art direction — rotates treatments so no two adjacent pages match,
+// and keeps effects proportional to the brand's atmosphere.
+function appDesign(promptUser: string) {
+  const atmosphere = (promptUser.match(/"atmosphere"\s*:\s*"([^"]*)"/)?.[1] || "restrained").toLowerCase();
+  const clean = atmosphere === "none";
+  const rich = atmosphere === "rich";
+  const routes = [...promptUser.matchAll(/^\s*(\/[a-z0-9\-/[\]]*)\s+—\s+(.+)$/gim)].map((m) => ({ route: m[1], purpose: m[2] }));
+  const list = routes.length ? routes : [{ route: "/dashboard", purpose: "Overview" }];
+
+  const heroes = ["colossal", "editorial", "split", "centered", "minimal"];
+  const decors = clean ? ["grid", "none", "grid", "none", "mesh"] : rich ? ["orbs", "aurora", "rays", "mesh", "orbs"] : ["mesh", "grid", "orbs", "none", "rays"];
+  const motions = ["mask", "stagger", "slide", "blur", "rise"];
+  const layouts = ["cards", "magazine", "rows", "mosaic", "cards"];
+
+  return {
+    motion_language: clean ? "restrained fades and precise reveals" : "layered reveals with gentle parallax",
+    signature_visual: clean ? "An oversized typographic number wall that anchors the workspace" : "A drifting light form that follows the pointer across the workspace",
+    pages: list.map((p, i) => ({
+      route: p.route,
+      hero: heroes[i % heroes.length],
+      decor: decors[i % decors.length],
+      motion: motions[i % motions.length],
+      layout: layouts[i % layouts.length],
+      eyebrow: p.purpose.split(/[.,]/)[0].slice(0, 40),
+      headline: capitalize(p.purpose.split(/[.,]/)[0].slice(0, 60)),
+      subcopy: `Everything here is live and stored in your database.`,
+      visual_idea: clean ? "Generous whitespace with a single decisive rule line" : "A soft light form drifting behind the content",
+    })),
+    custom_css: "",
+  };
+}
+
 function websitePlan() {
   return {
     pages: [
@@ -512,6 +544,9 @@ export class MockProvider implements AiProvider {
         break;
       case "application-blueprint":
         payload = applicationBlueprint(opts.user);
+        break;
+      case "app-design":
+        payload = appDesign(opts.user);
         break;
       case "design-assistant":
         // Free-form reply (not JSON) — grounded in whatever context was passed in.
