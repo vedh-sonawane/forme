@@ -1,9 +1,9 @@
 import type { ApplicationBlueprint, DesignSystem, AppDesignSpec } from "@/lib/design/schema";
 import type { ProjectFile } from "./types";
-import { planModels, renderPrismaSchema } from "./prisma";
+import { planModels, planRelations, renderPrismaSchema } from "./prisma";
 import { scaffoldFiles, readmeFile } from "./scaffold";
 import { authFiles } from "./auth";
-import { crudFiles, appLayoutFile, dashboardFile, resolveArt, type PageArt } from "./pages";
+import { crudFiles, appLayoutFile, dashboardFile, resolveArt, BIND_HELPER, type PageArt } from "./pages";
 import { appUiCss, MOTION_COMPONENT, TRANSITION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
 import { PARTICLES_COMPONENT } from "./effects";
 import { retargetMarketingLinks } from "./links";
@@ -45,6 +45,7 @@ export function buildApplicationFiles(input: {
 
   const allModels = planModels(bp, authRequired);
   const models = allModels.slice(0, MAX_MODELS + (authRequired ? 1 : 0));
+  planRelations(bp, models, authRequired); // after slicing — relations must not point at a cut model
   const dataModels = models.filter((m) => !m.isUser);
   const userModel = models.find((m) => m.isUser) ?? null;
 
@@ -69,6 +70,7 @@ export function buildApplicationFiles(input: {
     .map((css, i) => `/* ── page composition ${i + 1} ── */\n${css}`)
     .join("\n\n");
   files.push({ path: "src/app/globals.css", content: appUiCss(system, [design?.custom_css ?? "", pageCss].filter(Boolean).join("\n\n")) });
+  files.push({ path: "src/lib/bind.ts", content: BIND_HELPER });
   files.push({ path: "src/components/Motion.tsx", content: MOTION_COMPONENT });
   files.push({ path: "src/components/PageTransition.tsx", content: TRANSITION_COMPONENT });
   // Canvas particle field, emitted whenever a composition asks for it.
@@ -205,7 +207,8 @@ export default function HomePage() {
       ...crudFiles(
         m,
         authRequired,
-        artFor(route, i + 1, { eyebrow: label, headline: label.charAt(0).toUpperCase() + label.slice(1), subcopy: `Create, browse and manage ${m.name.toLowerCase()} records — stored in your database.` })
+        artFor(route, i + 1, { eyebrow: label, headline: label.charAt(0).toUpperCase() + label.slice(1), subcopy: `Create, browse and manage ${m.name.toLowerCase()} records — stored in your database.` }),
+        models
       )
     );
   });

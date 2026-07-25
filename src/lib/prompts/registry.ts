@@ -315,11 +315,29 @@ ${DNA_SHAPE}`,
 
   "app-design-v1": {
     operation: "app-design",
-    build: (input: { requirements: string; directionJson: string; pages: string }): BuiltPrompt => ({
+    build: (input: { requirements: string; directionJson: string; pages: string; bindings?: string }): BuiltPrompt => ({
       system: `You are art-directing the INSIDE of a product — the signed-in application pages, not the
 marketing landing page. The landing page is already beautiful; the app must feel like the SAME product:
 same art direction, same atmosphere, same quality. A plain CRUD admin bolted onto a beautiful landing
 page is the failure you are preventing.
+
+You have FULL creative freedom over what each page contains, and it should be specific to THIS domain —
+a bioacoustic archive gets spectrogram panels and provenance notes; a children's maths tutor gets a
+lesson map and a mascot; a foundry gets heat curves and batch cards. Invent the panels, sections and
+artwork this particular product deserves. Do not reach for a generic "dashboard with three cards".
+
+THE ONE HARD RULE: never invent DATA.
+A brand-new account has nothing in it. If you write "88% Overall Curriculum Mastery" or "Streak: 5 days"
+into the markup, a user who just signed up is shown a number they did not earn, and the entire product
+reads as a fake demo. That is the single worst thing you can do here.
+- Any figure that describes the user's data MUST be written as a binding token (listed below). The
+  server replaces it with a real value from the database.
+- If no binding fits what you wanted to show, do not show a number at all — design the panel so it
+  works empty, or write copy instead.
+- Labels, headings, explanations, domain facts and illustrative artwork are yours to write freely.
+  Static numbers that are part of the SUBJECT ("1,600 known species of hummingbird", "440 Hz") are fine.
+  Numbers that pretend to describe THIS user's activity are not.
+- Design the empty state deliberately: it is the first thing every new user sees.
 
 Give EVERY page its own visual identity. Rules:
 - No two consecutive pages share a hero treatment, decor or layout — vary the rhythm deliberately
@@ -334,6 +352,12 @@ ${JSON_ONLY}`,
       user: `Product requirements:\n${input.requirements}\n
 Art direction (the landing page follows this — the app MUST match it):\n${input.directionJson}\n
 Application pages to art-direct (route — purpose):\n${input.pages}\n
+DATA BINDINGS available for this product — the ONLY way to display the user's numbers.
+Write the token verbatim in your markup and the server substitutes the real value
+(an account with no records renders "—", which is the honest answer):
+${input.bindings || "(none — this product has no queryable entities yet, so show no statistics at all)"}
+Example: <div class="card"><span class="kicker">Recordings archived</span><div class="stat-num">{{count:Recording}}</div></div>
+
 COMPOSE EACH PAGE YOURSELF. Do not pick from a menu of stock layouts — write the actual markup.
 For every page return "html": a real composition (multiple sections if it serves the page) using any
 structure you want — asymmetric and split layouts, bento grids, overlapping/floating elements, magazine
@@ -349,7 +373,7 @@ Available building blocks (already styled — reuse them so pages stay one syste
   type      .kicker .t-colossal .t-display .t-title .t-lead .stat-num .muted .balance
   controls  .btn .btn-primary .btn-ghost .input .label .tag
   motion    .rv (+ .rv-mask .rv-blur .rv-slide .rv-scale) .stagger .zoomable
-            data-parallax="0.3"  data-mouse="20"  data-tilt  data-countup="120"
+            data-parallax="0.3"  data-mouse="20"  data-tilt  data-countup="{{count:Model}}" (bindings only)
   effects   put <div class="fx fx-NAME" aria-hidden="true"></div> inside a .fx-parent section:
             aurora waterfall waves stars fog particles mesh rays blobs orbit grid grain bloom
 Tokens you may use in CSS: var(--primary) var(--primary-500..950) var(--accent) var(--surface)

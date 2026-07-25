@@ -3,6 +3,8 @@ import { createZip, type ZipFile } from "@/lib/export/zip";
 import { parseJSON, toJSON } from "@/lib/utils";
 import { ApplicationBlueprintSchema, DesignSystemSchema, DesignDirectionSchema, RequirementsSchema, AppDesignSpecSchema, type AppDesignSpec } from "@/lib/design/schema";
 import { buildApplicationFiles, appIdentity } from "@/lib/appgen";
+import { planModels } from "@/lib/appgen/prisma";
+import { availableBindings } from "@/lib/appgen/bindings";
 import { designApplicationUI } from "@/lib/agents";
 import { resolveImagePlaceholders } from "@/lib/images/provider";
 import { kebabPlural, pascal } from "@/lib/appgen/naming";
@@ -164,7 +166,10 @@ export async function buildProjectApp(
           .slice(0, 6)
           .map((e) => `/${kebabPlural(pascal(e.name))} — browse and manage ${e.name} records`),
       ].join("\n");
-      const res = await designApplicationUI(requirements, direction, routes);
+      // The catalogue of real, queryable values — so the model designs around data that
+      // exists instead of inventing a "88% mastery" figure for a brand-new account.
+      const bindings = availableBindings(planModels(blueprint, blueprint.auth?.required === true));
+      const res = await designApplicationUI(requirements, direction, routes, bindings);
       design = AppDesignSpecSchema.parse(res.data);
       // Swap <img data-image="…"> placeholders for real licensed photography. Resolved
       // before caching so redeploys don't re-hit the photo APIs.

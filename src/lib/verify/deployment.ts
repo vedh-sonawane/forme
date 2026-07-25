@@ -35,7 +35,7 @@ const MIN_CONTRAST = 4.5; // WCAG AA for body text — reported as a warning
 const INVISIBLE_CONTRAST = 1.35;
 const MAX_ROUTES = 8;
 
-type Measurement = { stuck: string[]; lowContrast: string[]; invisible: string[]; deadLinks: string[] };
+type Measurement = { stuck: string[]; lowContrast: string[]; invisible: string[]; deadLinks: string[]; placeholders: string[] };
 
 /**
  * In-page measurement, kept as SOURCE rather than a function reference: this runs in the
@@ -117,12 +117,16 @@ const measureSource = (min: number, severe: number) => `(async () => {
     else if (r < aa) lowContrast.push(note);
   }
 
+  // A composition may only show the user's numbers through a binding the server resolves.
+  // A token still visible in the rendered page means the value was never real.
+  const placeholders = Array.from(new Set((document.body.innerText.match(/\{\{[^{}]+\}\}/g) || []))).slice(0, 4);
+
   const ids = new Set(Array.from(document.querySelectorAll("[id]")).map((e) => e.id));
   const deadLinks = Array.from(document.querySelectorAll("a"))
     .filter((a) => { const h = a.getAttribute("href") || ""; return h === "" || h === "#" || (h.startsWith("#") && !ids.has(h.slice(1))); })
     .map((a) => '"' + (a.textContent || "").trim().slice(0, 24) + '"');
 
-  return { stuck, lowContrast: Array.from(new Set(lowContrast)), invisible: Array.from(new Set(invisible)), deadLinks };
+  return { stuck, lowContrast: Array.from(new Set(lowContrast)), invisible: Array.from(new Set(invisible)), deadLinks, placeholders };
 })()`;
 
 const MEASURE = measureSource(MIN_CONTRAST, INVISIBLE_CONTRAST);
@@ -166,6 +170,7 @@ export async function verifyDeployedApp(baseUrl: string, account: HealthcheckAcc
       add(`${label} — text is visible`, m.invisible.length === 0, m.invisible.slice(0, 3).join(", "));
       add(`${label} — text meets AA contrast`, m.lowContrast.length === 0, m.lowContrast.slice(0, 3).join(", "), "warning");
       add(`${label} — no dead links`, m.deadLinks.length === 0, m.deadLinks.slice(0, 3).join(", "));
+      add(`${label} — data placeholders resolved`, m.placeholders.length === 0, m.placeholders.join(", "));
     };
 
     const landing = await page.goto(`${url}/`, { waitUntil: "networkidle" });

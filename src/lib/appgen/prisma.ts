@@ -6,6 +6,27 @@ import { camel, pascal, pluralize } from "./naming";
 // and relations are only emitted when both sides resolve (one relation per model pair,
 // so Prisma never sees an ambiguous relation it would reject).
 
+/**
+ * A "belongs to" link the UI can actually offer: the child's foreign key, the parent it
+ * points at, and the parent field worth showing in a picker. Without this the schema has
+ * relationships the interface can't reach, so every record is an island — which is what
+ * made generated apps feel like a form bolted to a list.
+ */
+export type RelationPlan = {
+  /** FK scalar on this model, e.g. "lessonId" */
+  field: string;
+  /** Parent model, e.g. "Lesson" */
+  target: string;
+  /** camelCase relation object, e.g. "lesson" */
+  object: string;
+  /** camelCase plural of the parent, e.g. "lessons" (its route/delegate) */
+  targetPlural: string;
+  /** Parent field to label options with, e.g. "title" */
+  label: string;
+  /** Human label for the form control, e.g. "Lesson" */
+  title: string;
+};
+
 export type ModelPlan = {
   name: string; // PascalCase model name
   plural: string; // camelCase plural (back-relation field on User)
@@ -14,6 +35,10 @@ export type ModelPlan = {
   isUser: boolean;
   /** Scalar fields safe to render in a generated form/list (no id/timestamps/secrets). */
   simple: { name: string; type: "String" | "Int" | "Float" | "Boolean" | "DateTime" }[];
+  /** Parents this model points at — rendered as real pickers, not free text. */
+  belongsTo: RelationPlan[];
+  /** Relation/ownership lines appended to the model block. */
+  extra: string[];
 };
 
 function mapType(raw: string): string {
@@ -66,7 +91,7 @@ export function planModels(bp: ApplicationBlueprint, authRequired: boolean): Mod
       simple.push({ name: "title", type: "String" });
     }
 
-    models.push({ name, plural: camel(pluralize(name)), fields, declared, isUser, simple: simple.slice(0, 6) });
+    models.push({ name, plural: camel(pluralize(name)), fields, declared, isUser, simple: simple.slice(0, 6), belongsTo: [], extra: [] });
   }
 
   // Ensure a User model exists when the app needs authentication.
@@ -85,6 +110,8 @@ export function planModels(bp: ApplicationBlueprint, authRequired: boolean): Mod
         "  createdAt DateTime @default(now())",
       ],
       isUser: true,
+      belongsTo: [],
+      extra: [],
     });
   }
 
@@ -100,20 +127,32 @@ export function planModels(bp: ApplicationBlueprint, authRequired: boolean): Mod
   return models;
 }
 
-export function renderPrismaSchema(bp: ApplicationBlueprint, models: ModelPlan[], authRequired: boolean, provider: "sqlite" | "postgresql" = "sqlite"): string {
+/** The parent field a picker should show — the first human-readable string on the model. */
+function labelFieldOf(m: ModelPlan): string {
+  const named = m.simple.find((f) => /^(title|name|label|headline|subject)$/i.test(f.name) && f.type === "String");
+  return (named ?? m.simple.find((f) => f.type === "String"))?.name ?? "id";
+}
+
+/**
+ * Ownership + blueprint relationships, recorded on the models so the SCHEMA and the
+ * INTERFACE are generated from one source. Previously only the schema knew about these,
+ * which is why the foreign keys existed but nothing could ever set them.
+ */
+export function planRelations(bp: ApplicationBlueprint, models: ModelPlan[], authRequired: boolean): void {
+  // Must run on the FINAL model list. The generator caps how many models an app gets, and
+  // a relation pointing at a model that was cut produces a schema Prisma rejects outright.
+  for (const m of models) { m.extra = []; m.belongsTo = []; }
   const user = models.find((m) => m.isUser) ?? null;
   const byName = new Map(models.map((m) => [m.name, m]));
   const pairSeen = new Set<string>();
-  const extra: Record<string, string[]> = {};
-  const push = (model: string, line: string) => { (extra[model] ??= []).push(line); };
 
   // 1) Ownership: every non-user model belongs to a user (drives per-user CRUD).
   if (authRequired && user) {
     for (const m of models) {
       if (m.isUser) continue;
-      if (!m.declared.has("ownerId")) { push(m.name, "  ownerId   String?"); m.declared.add("ownerId"); }
-      if (!m.declared.has("owner")) { push(m.name, `  owner     ${user.name}? @relation(fields: [ownerId], references: [id], onDelete: Cascade)`); m.declared.add("owner"); }
-      if (!user.declared.has(m.plural)) { push(user.name, `  ${m.plural.padEnd(9)} ${m.name}[]`); user.declared.add(m.plural); }
+      if (!m.declared.has("ownerId")) { m.extra.push("  ownerId   String?"); m.declared.add("ownerId"); }
+      if (!m.declared.has("owner")) { m.extra.push(`  owner     ${user.name}? @relation(fields: [ownerId], references: [id], onDelete: Cascade)`); m.declared.add("owner"); }
+      if (!user.declared.has(m.plural)) { user.extra.push(`  ${m.plural.padEnd(9)} ${m.name}[]`); user.declared.add(m.plural); }
       pairSeen.add([user.name, m.name].sort().join("~"));
     }
   }
@@ -130,23 +169,38 @@ export function renderPrismaSchema(bp: ApplicationBlueprint, models: ModelPlan[]
 
     const kind = (rel.kind || "one-to-many").toLowerCase();
     if (kind.includes("many-to-many")) {
-      if (!a.declared.has(b.plural)) { push(a.name, `  ${b.plural.padEnd(9)} ${b.name}[]`); a.declared.add(b.plural); }
-      if (!b.declared.has(a.plural)) { push(b.name, `  ${a.plural.padEnd(9)} ${a.name}[]`); b.declared.add(a.plural); }
+      if (!a.declared.has(b.plural)) { a.extra.push(`  ${b.plural.padEnd(9)} ${b.name}[]`); a.declared.add(b.plural); }
+      if (!b.declared.has(a.plural)) { b.extra.push(`  ${a.plural.padEnd(9)} ${a.name}[]`); b.declared.add(a.plural); }
       continue;
     }
     // one-to-many (a has many b) and one-to-one both put the FK on b.
     const fk = camel(a.name) + "Id";
     const objField = camel(a.name);
     const one = kind.includes("one-to-one");
-    if (!b.declared.has(fk)) { push(b.name, `  ${fk.padEnd(9)} String?${one ? " @unique" : ""}`); b.declared.add(fk); }
-    if (!b.declared.has(objField)) { push(b.name, `  ${objField.padEnd(9)} ${a.name}? @relation(fields: [${fk}], references: [id])`); b.declared.add(objField); }
+    if (!b.declared.has(fk)) { b.extra.push(`  ${fk.padEnd(9)} String?${one ? " @unique" : ""}`); b.declared.add(fk); }
+    if (!b.declared.has(objField)) { b.extra.push(`  ${objField.padEnd(9)} ${a.name}? @relation(fields: [${fk}], references: [id])`); b.declared.add(objField); }
     const back = one ? camel(b.name) : b.plural;
-    if (!a.declared.has(back)) { push(a.name, `  ${back.padEnd(9)} ${b.name}${one ? "?" : "[]"}`); a.declared.add(back); }
-  }
+    if (!a.declared.has(back)) { a.extra.push(`  ${back.padEnd(9)} ${b.name}${one ? "?" : "[]"}`); a.declared.add(back); }
 
+    b.belongsTo.push({
+      field: fk,
+      target: a.name,
+      object: objField,
+      targetPlural: a.plural,
+      label: labelFieldOf(a),
+      title: a.name.replace(/([a-z0-9])([A-Z])/g, "$1 $2"),
+    });
+  }
+}
+
+export function renderPrismaSchema(_bp: ApplicationBlueprint, models: ModelPlan[], authRequired: boolean, provider: "sqlite" | "postgresql" = "sqlite"): string {
+  const user = models.find((m) => m.isUser) ?? null;
+
+  // Relations were planned alongside the models (see planRelations) so the schema and the
+  // generated interface can never disagree about what links to what.
   const modelBlocks = models
     .map((m) => {
-      const lines = [...m.fields, ...(extra[m.name] ?? [])];
+      const lines = [...m.fields, ...m.extra];
       if (authRequired && user && m.isUser) lines.push("  sessions  Session[]");
       return `model ${m.name} {\n${lines.join("\n")}\n}`;
     })

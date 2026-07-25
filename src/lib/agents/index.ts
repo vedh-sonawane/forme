@@ -103,10 +103,16 @@ export async function planSceneExperience(requirements: Requirements, direction:
 }
 
 // ── App Art Director: gives every IN-APP page its own visual identity ────────────
-export async function designApplicationUI(requirements: Requirements, direction: DesignDirection, pages: string): Promise<StructuredResult<AppDesignSpec>> {
+export async function designApplicationUI(
+  requirements: Requirements,
+  direction: DesignDirection,
+  pages: string,
+  /** Data bindings this product can actually resolve — the only way to show real numbers. */
+  bindings?: string
+): Promise<StructuredResult<AppDesignSpec>> {
   const p = prompts["app-design-v1"];
   return structured(
-    { operation: p.operation, promptVersion: "app-design-v1", model: "pro", maxOutputTokens: 12000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction), pages }) },
+    { operation: p.operation, promptVersion: "app-design-v1", model: "pro", maxOutputTokens: 12000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction), pages, bindings }) },
     AppDesignSpecSchema
   );
 }
