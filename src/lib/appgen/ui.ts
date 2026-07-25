@@ -296,6 +296,35 @@ export function Motion() {
 }
 `;
 
+/** Framer Motion page transition + photo credit overlay for the generated app shell. */
+export const TRANSITION_COMPONENT = `"use client";
+
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
+
+// Route-level choreography: content settles in with a spring rather than snapping.
+// Honours prefers-reduced-motion by collapsing to a plain fade.
+export function PageTransition({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const reduce = useReducedMotion();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={pathname}
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14, filter: "blur(6px)" }}
+        animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+        exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, filter: "blur(4px)" }}
+        transition={reduce ? { duration: 0.2 } : { type: "spring", stiffness: 260, damping: 30, mass: 0.9 }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+`;
+
 /** Decorative markup for a page treatment (sits behind content). */
 export function decorMarkup(decor: PageTreatment["decor"]): string {
   switch (decor) {

@@ -355,8 +355,17 @@ var(--text) var(--text-muted) var(--border) var(--e-1..4) var(--r-md) var(--s-8)
 var(--ease-out) var(--t-base).
 
 Rules for the markup:
-- Plain HTML attributes (class=, not className=). No <script>. No external images or fonts.
-- Draw artwork with inline SVG or CSS — it must render offline.
+- Plain HTML attributes (class=, not className=). No <script>. No external fonts.
+- REAL PHOTOGRAPHY: where a photograph genuinely tells the story better than a drawing —
+  a hero backdrop, an editorial split, a gallery, a card thumbnail — emit
+  <img data-image="specific search phrase" data-orientation="landscape|portrait|squarish" class="...">
+  and it is resolved into a real, licensed photo (lazy-loaded, dimension-hinted, colour
+  placeholder). Write precise, evocative queries ("misty old-growth rainforest canopy at dawn"),
+  not generic ones ("nature"). Use at most 3 per page, and none where a photo would just be
+  decoration — an interface, a diagram or an SVG scene is often the better answer.
+- For everything else draw artwork with inline SVG or CSS so it renders offline.
+- Motion: sections may use .rv/.stagger (CSS) — and Framer Motion is installed in the app if
+  you want to describe richer choreography in "visual_idea" for the shell to apply.
 - Decide what should feel ALIVE on this page based on what the product actually is, then build it: a
   waterfall for a river conservancy, drifting embers for a foundry, a slow sonar sweep for an audio
   archive, sifting grain for a bakery, orbiting bodies for an observatory. The named effects are a

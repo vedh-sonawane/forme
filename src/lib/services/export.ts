@@ -4,6 +4,7 @@ import { parseJSON } from "@/lib/utils";
 import { ApplicationBlueprintSchema, DesignSystemSchema, DesignDirectionSchema, RequirementsSchema, AppDesignSpecSchema, type AppDesignSpec } from "@/lib/design/schema";
 import { buildApplicationFiles, appIdentity } from "@/lib/appgen";
 import { designApplicationUI } from "@/lib/agents";
+import { resolveImagePlaceholders } from "@/lib/images/provider";
 import { kebabPlural, pascal } from "@/lib/appgen/naming";
 
 // Build a downloadable .zip of a project: the runnable site (index.html) plus its
@@ -148,6 +149,10 @@ export async function buildProjectApp(
       ].join("\n");
       const res = await designApplicationUI(requirements, direction, routes);
       design = AppDesignSpecSchema.parse(res.data);
+      // Swap <img data-image="…"> placeholders for real licensed photography.
+      design.pages = await Promise.all(
+        design.pages.map(async (p) => ({ ...p, html: await resolveImagePlaceholders(p.html) }))
+      );
     }
   } catch {
     // Art direction is an enhancement — fall back to the rotating defaults.

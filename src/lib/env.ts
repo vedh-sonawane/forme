@@ -51,6 +51,10 @@ export const env = {
     "gemini-flash-lite-latest",
   ]),
 
+  // ── Photography (Unsplash primary, Pexels fallback) ──
+  unsplashAccessKey: process.env.UNSPLASH_ACCESS_KEY ?? "",
+  pexelsApiKey: process.env.PEXELS_API_KEY ?? "",
+
   // ── Deployment (Vercel) ──
   vercelToken: process.env.VERCEL_TOKEN ?? "",
   vercelTeamId: process.env.VERCEL_TEAM_ID ?? "",

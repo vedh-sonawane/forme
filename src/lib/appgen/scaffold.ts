@@ -43,6 +43,7 @@ export function scaffoldFiles(input: {
         // known CVEs ("Vulnerable version of Next.js detected").
         dependencies: {
           "@prisma/client": "6.19.3",
+          "framer-motion": "12.42.2",
           next: "15.5.21",
           react: "19.2.8",
           "react-dom": "19.2.8",

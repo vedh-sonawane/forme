@@ -4,7 +4,7 @@ import { planModels, renderPrismaSchema } from "./prisma";
 import { scaffoldFiles, readmeFile } from "./scaffold";
 import { authFiles } from "./auth";
 import { crudFiles, appLayoutFile, dashboardFile, resolveArt, type PageArt } from "./pages";
-import { appUiCss, MOTION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
+import { appUiCss, MOTION_COMPONENT, TRANSITION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
 import { PARTICLES_COMPONENT } from "./effects";
 import { camel, kebabPlural, pascal } from "./naming";
 
@@ -69,6 +69,7 @@ export function buildApplicationFiles(input: {
     .join("\n\n");
   files.push({ path: "src/app/globals.css", content: appUiCss(system, [design?.custom_css ?? "", pageCss].filter(Boolean).join("\n\n")) });
   files.push({ path: "src/components/Motion.tsx", content: MOTION_COMPONENT });
+  files.push({ path: "src/components/PageTransition.tsx", content: TRANSITION_COMPONENT });
   // Canvas particle field, emitted whenever a composition asks for it.
   if ((design?.pages ?? []).some((p) => /fx-particles/.test(p.html || ""))) {
     files.push({ path: "src/components/Particles.tsx", content: PARTICLES_COMPONENT });
@@ -78,6 +79,7 @@ export function buildApplicationFiles(input: {
     content: `import type { Metadata } from "next";
 import Link from "next/link";
 import { Motion } from "@/components/Motion";
+import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -98,7 +100,7 @@ ${navLinks.map((l) => `              <Link href=${JSON.stringify(l.href)} classN
             </nav>
           </div>
         </header>
-        <main style={{ minHeight: "70vh" }}>{children}</main>
+        <main style={{ minHeight: "70vh" }}><PageTransition>{children}</PageTransition></main>
         <footer style={{ borderTop: "1px solid var(--border)", marginTop: "4rem" }}>
           <div className="wrap row" style={{ justifyContent: "space-between", paddingBlock: "2.2rem" }}>
             <span className="muted" style={{ fontSize: ".85rem" }}>© {new Date().getFullYear()} ${appName}</span>
