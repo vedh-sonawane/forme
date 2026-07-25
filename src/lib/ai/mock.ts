@@ -407,6 +407,28 @@ function applicationBlueprint(promptUser: string) {
   };
 }
 
+// Deterministic assistant reply grounded in the project context that was passed in —
+// clearly marked as the development fallback, never pretending to be a real model.
+function assistantReply(promptUser: string): string {
+  const art = promptUser.match(/art direction:\s*([^\n]+)/i)?.[1]?.trim();
+  const score = promptUser.match(/score:\s*([0-9.]+)/i)?.[1];
+  const name = promptUser.match(/project:\s*([^\n]+)/i)?.[1]?.trim();
+  const msg = promptUser.split("USER'S MESSAGE:")[1]?.trim().slice(0, 200) || "your question";
+  const issue = promptUser.match(/-\s*([a-z ]+):\s*(?:low|medium|high)/i)?.[1]?.trim();
+
+  return [
+    `**Development fallback reply** (no AI provider available — add a key to get a real answer).`,
+    ``,
+    `On “${msg}”${name ? ` for **${name}**` : ""}:`,
+    art ? `- The project's art direction is **${art}** — any change should stay inside that language rather than importing a different style.` : "",
+    score ? `- The current version scores **${score}**, so there's measurable headroom; targeted fixes beat a full regenerate.` : "",
+    issue ? `- The critique already flags **${issue}** — that's the highest-leverage thing to address first.` : "",
+    `- A concrete instruction you could apply with the editor: “Improve ${issue || "visual hierarchy"} in the current design while keeping the existing content and art direction.”`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function websitePlan() {
   return {
     pages: [
@@ -491,6 +513,22 @@ export class MockProvider implements AiProvider {
       case "application-blueprint":
         payload = applicationBlueprint(opts.user);
         break;
+      case "design-assistant":
+        // Free-form reply (not JSON) — grounded in whatever context was passed in.
+        return {
+          text: assistantReply(opts.user),
+          meta: {
+            provider: this.name,
+            model: "mock",
+            operation: opts.operation,
+            promptVersion: opts.promptVersion,
+            inputType: "text",
+            inputTokens: Math.ceil(opts.user.length / 4),
+            outputTokens: 120,
+            latencyMs: 40 + (seed % 60),
+            ok: true,
+          },
+        };
       case "visual-critique":
         payload = critique(seed);
         break;

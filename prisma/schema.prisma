@@ -67,6 +67,7 @@ model Project {
   feedback         UserFeedback[]
   signals          PreferenceSignal[]
   deployments      Deployment[]
+  chatMessages     ChatMessage[]
 
   @@index([userId])
   @@index([status])
@@ -356,6 +357,20 @@ model PreferenceSignal {
 
   @@index([signalType])
   @@index([category])
+}
+
+// ── Conversational design assistant (persistent per-project memory) ────────────
+model ChatMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  role      String // user | assistant
+  content   String
+  modelMeta String? // JSON: provider, model (which AI answered)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 // ── Deployments (generated app → hosting provider) ─────────────────────────────

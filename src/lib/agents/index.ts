@@ -1,4 +1,4 @@
-import { structured, type StructuredResult } from "@/lib/ai/provider";
+import { structured, generateRaw, type StructuredResult } from "@/lib/ai/provider";
 import { prompts } from "@/lib/prompts/registry";
 import type { ImageInput } from "@/lib/ai/types";
 import {
@@ -98,6 +98,19 @@ export async function planSceneExperience(requirements: Requirements, direction:
     { operation: p.operation, promptVersion: "scene-plan-v1", model: "pro", maxOutputTokens: 16000, ...p.build({ requirements: JSON.stringify(requirements), directionJson: JSON.stringify(direction) }) },
     ScenePlanSchema
   );
+}
+
+// ── Design Assistant: project-aware conversation (free-form, not structured) ─────
+export async function askDesignAssistant(input: { context: string; history: string; message: string }) {
+  const p = prompts["design-assistant-v1"];
+  return generateRaw({
+    operation: p.operation,
+    promptVersion: "design-assistant-v1",
+    model: "flash",
+    maxOutputTokens: 2000,
+    temperature: 0.6,
+    ...p.build(input),
+  });
 }
 
 // ── Application Architect: plan a full-stack app before generation ──────────────

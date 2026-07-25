@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
 import { DirectionView, SystemPreview, CritiqueView } from "./Viewers";
 import { PreviewFrame } from "./PreviewFrame";
 
-type Tab = "overview" | "references" | "direction" | "blueprint" | "build" | "files" | "redesign" | "versions";
+type Tab = "overview" | "assistant" | "references" | "direction" | "blueprint" | "build" | "files" | "redesign" | "versions";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "assistant", label: "Assistant" },
   { id: "references", label: "References" },
   { id: "direction", label: "Design Direction" },
   { id: "blueprint", label: "App Blueprint" },
@@ -218,6 +219,9 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
         </div>
       )}
 
+      {/* ASSISTANT */}
+      {tab === "assistant" && <AssistantTab projectId={p.id} canEdit={!!latestSite} onApply={edit} busy={busy} />}
+
       {/* APP BLUEPRINT */}
       {tab === "blueprint" && <BlueprintTab projectId={p.id} />}
 
@@ -402,6 +406,142 @@ function BuildTab({
             <CritiqueView critique={selected.critique} />
           </div>
         ) : <div className="card p-5 text-sm text-muted">No critique for this version.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Assistant: project-aware design partner with persistent memory ────────────────
+type ChatMsg = { id: string; role: "user" | "assistant"; content: string; model?: { provider: string; model: string } | null; createdAt?: string };
+
+const ASSISTANT_PROMPTS = [
+  "What's the weakest part of this design right now?",
+  "How could this feel more premium without changing the brand?",
+  "Is the visual hierarchy working on mobile?",
+  "What should I fix first to raise the score?",
+];
+
+function AssistantTab({ projectId, canEdit, onApply, busy }: { projectId: string; canEdit: boolean; onApply: (instruction: string) => void; busy: string | null }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const d = await api<{ messages: ChatMsg[] }>(`/api/projects/${projectId}/chat`);
+        if (alive) setMessages(d.messages);
+      } catch {
+        /* empty thread */
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [projectId]);
+
+  async function send(text: string) {
+    const msg = text.trim();
+    if (!msg || sending) return;
+    setSending(true);
+    setErr(null);
+    setInput("");
+    const optimistic: ChatMsg = { id: `tmp-${Date.now()}`, role: "user", content: msg };
+    setMessages((prev) => [...prev, optimistic]);
+    try {
+      const r = await api<{ id: string; content: string; model: { provider: string; model: string } }>(`/api/projects/${projectId}/chat`, {
+        method: "POST",
+        body: JSON.stringify({ message: msg }),
+      });
+      setMessages((prev) => [...prev, { id: r.id, role: "assistant", content: r.content, model: r.model }]);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "The assistant didn't reply.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function clear() {
+    await api(`/api/projects/${projectId}/chat`, { method: "DELETE" }).catch(() => {});
+    setMessages([]);
+  }
+
+  return (
+    <div className="animate-in grid grid-cols-1 gap-4 xl:grid-cols-[1fr_300px]">
+      <div className="card flex max-h-[70vh] flex-col p-0">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <div>
+            <h3 className="text-sm font-semibold">Design assistant</h3>
+            <p className="text-xs text-fg-dim">Knows this project — its direction, blueprint, current version and critique.</p>
+          </div>
+          {messages.length > 0 && <button className="btn-subtle text-xs" onClick={clear}>Clear</button>}
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-auto px-5 py-4">
+          {loading ? (
+            <p className="text-sm text-muted">Loading conversation…</p>
+          ) : messages.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-fg-dim">Ask anything about this project — no need to explain it first.</p>
+            </div>
+          ) : (
+            messages.map((m) => (
+              <div key={m.id} className={cn("flex flex-col gap-1", m.role === "user" ? "items-end" : "items-start")}>
+                <div className={cn("max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm", m.role === "user" ? "bg-accent/15 text-fg" : "border bg-surface-2/50 text-fg-dim")}>
+                  {m.content}
+                </div>
+                {m.role === "assistant" && (
+                  <div className="flex items-center gap-2 px-1">
+                    {m.model && <ModelBadge model={m.model} showModel={false} />}
+                    {canEdit && (
+                      <button
+                        className="btn-subtle text-[11px]"
+                        disabled={!!busy}
+                        title="Send this suggestion to the AI Editor"
+                        onClick={() => onApply(m.content.slice(0, 500))}
+                      >
+                        Apply as edit
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          {sending && <p className="text-sm text-muted">Thinking…</p>}
+          {err && <p className="text-sm text-[color:var(--danger)]">{err}</p>}
+        </div>
+
+        <div className="border-t p-3">
+          <div className="flex gap-2">
+            <input
+              className="input"
+              placeholder="Ask about this project…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+              disabled={sending}
+            />
+            <button className="btn-primary" onClick={() => void send(input)} disabled={sending || !input.trim()}>
+              {sending ? <Spinner className="h-4 w-4" /> : "Send"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card h-fit p-5">
+        <h3 className="text-sm font-semibold">Try asking</h3>
+        <div className="mt-3 space-y-2">
+          {ASSISTANT_PROMPTS.map((q) => (
+            <button key={q} className="w-full rounded-xl border px-3 py-2 text-left text-xs text-fg-dim transition hover:border-accent/40 hover:text-fg" disabled={sending} onClick={() => void send(q)}>
+              {q}
+            </button>
+          ))}
+        </div>
+        <p className="mt-4 text-[11px] text-muted">The conversation is saved with the project, so context carries across sessions.</p>
       </div>
     </div>
   );
