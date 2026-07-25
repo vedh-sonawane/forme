@@ -13,3 +13,8 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .DS_Store
+
+# local scratch files
+_*.tmp
+_*.mjs
+_*.sh
