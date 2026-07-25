@@ -29,7 +29,9 @@ Built to solve the core failure of AI website builders: technically-working but 
 | **Application Blueprint** — full-stack plan (entities, relationships, pages, API, auth + roles, env, deployment, testing) before any code | ✅ working |
 | **Export app** — the blueprint becomes a **real, runnable Next.js + Prisma app**: schema, working auth, CRUD pages + REST API, dashboard, your design tokens, and the generated site served at `/` | ✅ **verified: npm install + prisma + next build + runtime CRUD** |
 | **File explorer** — browse the generated app's source in-app (tree + line-numbered viewer) | ✅ working |
-| **One-click deploy to Vercel** — production deploy, live URL, status polling, build logs | 🚧 built; needs a `VERCEL_TOKEN` to verify against the live API |
+| **One-click deploy to Vercel** — production deploy, live URL, status polling, build logs | ✅ **verified live: deployed app signs up, signs in and writes to Postgres** |
+
+> **Deploying needs a hosted database.** Set `VERCEL_TOKEN` and `DEPLOY_DATABASE_URL` (a Postgres URL — Neon / Vercel Postgres / Supabase all have free tiers). The deployed copy is generated with the Postgres provider and its tables are created during the build. SQLite can't persist on serverless hosts, so FORME refuses to deploy without one rather than shipping an app whose sign-up silently fails. The `.zip` export stays SQLite for zero-setup local runs.
 
 Every AI stage falls back through a **provider chain** (Gemini → Mistral → OpenRouter → clearly-marked mock), so a quota stall never breaks the app — and the UI always shows which provider actually produced each artifact.
 
