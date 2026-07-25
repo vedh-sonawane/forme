@@ -4,7 +4,37 @@ import { camel, kebabPlural } from "./naming";
 import { decorMarkup, revealClass, type PageTreatment } from "./ui";
 
 // Art direction for a page, resolved from the AI's App Design Spec (with a safe default).
-export type PageArt = PageTreatment & { eyebrow: string; headline: string; subcopy: string; visualIdea: string };
+export type PageArt = PageTreatment & { eyebrow: string; headline: string; subcopy: string; visualIdea: string; html?: string; css?: string };
+
+const DATA_MARKER = "<!--DATA-->";
+
+/** Strip anything unsafe/unrenderable from AI-authored markup before embedding it. */
+export function sanitizeMarkup(html: string): string {
+  return (html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<link[^>]*>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "") // inline handlers
+    .replace(/javascript:/gi, "")
+    .replace(/className=/g, "class=")
+    .trim();
+}
+
+/**
+ * The AI composes the page; the interactive data component is injected at <!--DATA-->.
+ * Returns null when the markup is unusable so the caller falls back to a built-in
+ * treatment — creative freedom, but never a broken page.
+ */
+export function composedPage(art: PageArt, dataJsx: string): string | null {
+  const html = sanitizeMarkup(art.html ?? "");
+  if (html.length < 120 || !html.includes(DATA_MARKER)) return null;
+  const [before, after = ""] = html.split(DATA_MARKER);
+  const block = (s: string) => (s.trim() ? `<div dangerouslySetInnerHTML={{ __html: ${JSON.stringify(s)} }} />` : "");
+  return `<>
+      ${block(before)}
+      ${dataJsx}
+      ${block(after)}
+    </>`;
+}
 
 const HERO_OK = ["colossal", "editorial", "split", "centered", "minimal"];
 const DECOR_OK = ["orbs", "mesh", "grid", "rays", "aurora", "none"];
@@ -22,6 +52,8 @@ export function resolveArt(raw: Partial<Record<string, string>> | undefined, fal
     headline: raw?.headline?.trim() || defaults.headline,
     subcopy: raw?.subcopy?.trim() || defaults.subcopy,
     visualIdea: raw?.visual_idea?.trim() || "",
+    html: raw?.html ?? "",
+    css: raw?.css ?? "",
   };
 }
 
@@ -144,12 +176,13 @@ ${authRequired ? '  const user = await getSessionUser();\n  if (!user) redirect(
   const initial = rows.map((r) => (${rowMapper(fields)}));
 
   return (
-    <>
+    ${composedPage(art, `<section className="wrap" style={{ paddingBlock: "clamp(2rem,5vw,3.5rem)" }}><${comp} initial={initial} /></section>`) ??
+      `<>
       ${heroMarkup(art)}
       <section className="wrap" style={{ paddingBottom: "clamp(3rem,8vw,6rem)" }}>
         <${comp} initial={initial} />
       </section>
-    </>
+    </>`}
   );
 }
 `;
@@ -363,7 +396,7 @@ ${counts},
         : ""
     }
   return (
-    <>
+    ${composedPage(art, `<section className="wrap" style={{ paddingBlock: "clamp(2rem,5vw,3.5rem)" }}>${dashboardCards(data)}</section>`) ?? `<>
       ${heroMarkup(art)}
       <section className="wrap" style={{ paddingBottom: "clamp(3rem,8vw,6rem)" }}>
         <div className="grid g3 stagger">
@@ -380,9 +413,26 @@ ${data
   .join("\n")}
         </div>
       </section>
-    </>
+    </>`}
   );
 }
 `,
   };
+}
+
+/** The dashboard's live metric cards (shared by the composed + fallback layouts). */
+function dashboardCards(data: ModelPlan[]): string {
+  return `<div className="grid g3 stagger">
+${data
+  .map(
+    (m) => `          <Link href="/${kebabPlural(m.name)}" className="card" data-tilt style={{ display: "block" }}>
+            <div className="stat-num" data-countup={${camel(m.name)}Count}>{${camel(m.name)}Count}</div>
+            <div className="row" style={{ justifyContent: "space-between", marginTop: ".9rem" }}>
+              <span style={{ fontWeight: 600 }}>${m.plural}</span>
+              <span className="muted" style={{ fontSize: ".8rem" }}>View →</span>
+            </div>
+          </Link>`
+  )
+  .join("\n")}
+        </div>`;
 }

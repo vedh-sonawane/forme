@@ -290,6 +290,14 @@ export const AppPageDesignSchema = z.object({
   headline: str,
   subcopy: str,
   visual_idea: str, // the ONE memorable visual idea for this page
+  /**
+   * The page composed by the AI as real markup — any layout, SVG, decorative element.
+   * Must contain the marker <!--DATA--> where the interactive (React) data component
+   * is injected. Rendered as HTML, so creative freedom can never break the build.
+   */
+  html: str,
+  /** Page-scoped CSS supporting that markup (appended after the design system). */
+  css: str,
 });
 
 export const AppDesignSpecSchema = z.object({

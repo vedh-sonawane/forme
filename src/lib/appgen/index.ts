@@ -5,6 +5,7 @@ import { scaffoldFiles, readmeFile } from "./scaffold";
 import { authFiles } from "./auth";
 import { crudFiles, appLayoutFile, dashboardFile, resolveArt, type PageArt } from "./pages";
 import { appUiCss, MOTION_COMPONENT, DEFAULT_TREATMENTS } from "./ui";
+import { PARTICLES_COMPONENT } from "./effects";
 import { camel, kebabPlural, pascal } from "./naming";
 
 export type { ProjectFile } from "./types";
@@ -58,9 +59,20 @@ export function buildApplicationFiles(input: {
   files.push(...scaffoldFiles({ appName, slug, bp, system, authRequired, navLinks }));
   files.push(readmeFile({ appName, bp, authRequired, entityRoutes }));
 
-  // ── Visual layer: art-directed design system + motion runtime + app shell ──
-  files.push({ path: "src/app/globals.css", content: appUiCss(system, design?.custom_css ?? "") });
+  // ── Visual layer: tokens + effects + AI page CSS + motion runtime + app shell ──
+  // Page-scoped CSS from the AI is appended after the design system so every page keeps
+  // the shared palette/type/spacing while adding its own bespoke scene styling.
+  const pageCss = (design?.pages ?? [])
+    .map((p) => (p.css || "").trim())
+    .filter(Boolean)
+    .map((css, i) => `/* ── page composition ${i + 1} ── */\n${css}`)
+    .join("\n\n");
+  files.push({ path: "src/app/globals.css", content: appUiCss(system, [design?.custom_css ?? "", pageCss].filter(Boolean).join("\n\n")) });
   files.push({ path: "src/components/Motion.tsx", content: MOTION_COMPONENT });
+  // Canvas particle field, emitted whenever a composition asks for it.
+  if ((design?.pages ?? []).some((p) => /fx-particles/.test(p.html || ""))) {
+    files.push({ path: "src/components/Particles.tsx", content: PARTICLES_COMPONENT });
+  }
   files.push({
     path: "src/app/layout.tsx",
     content: `import type { Metadata } from "next";

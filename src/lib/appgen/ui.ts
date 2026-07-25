@@ -1,4 +1,6 @@
 import type { DesignSystem } from "@/lib/design/schema";
+import { tokenCss } from "./tokens";
+import { effectsCss } from "./effects";
 
 // The generated application's VISUAL layer: a rich, art-directed design system plus a
 // motion runtime. This is what stops the app half of a generated project from looking
@@ -36,6 +38,8 @@ export function appUiCss(s: DesignSystem, customCss = ""): string {
   return `@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+${tokenCss(s)}
 
 :root{
   --bg:${c.bg};--surface:${c.surface};--surface-alt:${c.surfaceAlt};
@@ -159,6 +163,7 @@ p{color:var(--text-muted)}
   .aurora,.shape,.empty-art{animation:none}
   html{scroll-behavior:auto}
 }
+${effectsCss()}
 ${customCss ? `\n/* ── Brand flourishes (art-directed) ── */\n${customCss}\n` : ""}
 `.trim();
 }

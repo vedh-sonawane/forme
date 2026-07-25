@@ -334,20 +334,48 @@ ${JSON_ONLY}`,
       user: `Product requirements:\n${input.requirements}\n
 Art direction (the landing page follows this — the app MUST match it):\n${input.directionJson}\n
 Application pages to art-direct (route — purpose):\n${input.pages}\n
+COMPOSE EACH PAGE YOURSELF. Do not pick from a menu of stock layouts — write the actual markup.
+For every page return "html": a real composition (multiple sections if it serves the page) using any
+structure you want — asymmetric and split layouts, bento grids, overlapping/floating elements, magazine
+columns, oversized type, inline SVG artwork, decorative dividers, stat blocks, quotes, illustrated
+panels. It MUST contain the marker <!--DATA--> exactly once, where the app's interactive data component
+(forms, lists, live records) is injected. Everything you write around it is yours to design.
+
+Available building blocks (already styled — reuse them so pages stay one system):
+  layout    .wrap .wrap-wide .wrap-narrow .grid .g2 .g3 .split .stack .row .fx-parent
+  surfaces  .card .glass .panel .hairline .empty
+  type      .kicker .t-colossal .t-display .t-title .t-lead .stat-num .muted .balance
+  controls  .btn .btn-primary .btn-ghost .input .label .tag
+  motion    .rv (+ .rv-mask .rv-blur .rv-slide .rv-scale) .stagger .zoomable
+            data-parallax="0.3"  data-mouse="20"  data-tilt  data-countup="120"
+  effects   put <div class="fx fx-NAME" aria-hidden="true"></div> inside a .fx-parent section:
+            aurora waterfall waves stars fog particles mesh rays blobs orbit grid grain bloom
+Tokens you may use in CSS: var(--primary) var(--primary-500..950) var(--accent) var(--surface)
+var(--text) var(--text-muted) var(--border) var(--e-1..4) var(--r-md) var(--s-8) var(--fs-4xl)
+var(--ease-out) var(--t-base).
+
+Rules for the markup:
+- Plain HTML attributes (class=, not className=). No <script>. No external images or fonts.
+- Draw artwork with inline SVG or CSS — it must render offline.
+- Decide what should feel ALIVE on this page based on what the product actually is, then build it: a
+  waterfall for a river conservancy, drifting embers for a foundry, a slow sonar sweep for an audio
+  archive, sifting grain for a bakery, orbiting bodies for an observatory. The named effects are a
+  starting kit — if none fits, author your own animated inline SVG / CSS scene in "html" + "css"
+  (keyframes, masks, gradients, strokes). Motion must be subtle, purposeful and never hurt readability.
+  A restrained brand may use none at all. Never repeat the same effect on every page.
+- Real copy for THIS product. Semantic headings, alt/aria on meaningful elements, keyboard-safe.
+- Mobile first: it must reflow cleanly at 380px — no fixed pixel widths on layout containers.
+
 Return JSON:
 {"motion_language","signature_visual",
- "pages":[{"route","hero","decor","motion","layout","eyebrow","headline","subcopy","visual_idea"}],
+ "pages":[{"route","hero","decor","motion","layout","eyebrow","headline","subcopy","visual_idea","html","css"}],
  "custom_css"}
 
-Vocabularies (choose per page, vary them):
-- hero: colossal | editorial | split | centered | minimal
-- decor: orbs | mesh | grid | rays | aurora | none
-- motion: stagger | mask | rise | blur | slide
-- layout: cards | magazine | rows | mosaic
-
-custom_css: a small block of extra CSS for brand flourishes that build on the existing tokens
-(--primary, --accent, --surface, --text, --font-heading). It is appended AFTER the base app design
-system, so you may only ADD or override styles — never assume new markup exists. Keep it under 40 lines.`,
+hero/decor/motion/layout still describe the page in one word (hero: colossal|editorial|split|centered|minimal,
+decor: orbs|mesh|grid|rays|aurora|none, motion: stagger|mask|rise|blur|slide, layout: cards|magazine|rows|mosaic)
+and are used as a fallback if the markup is unusable.
+"css" is page-scoped CSS for your markup; "custom_css" is global brand polish. Build on the tokens above so
+every page shares one palette, type scale, radius, shadow and timing — the product must feel interconnected.`,
     }),
   },
 
