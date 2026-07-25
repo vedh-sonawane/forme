@@ -11,13 +11,14 @@ import { cn } from "@/lib/utils";
 import { DirectionView, SystemPreview, CritiqueView } from "./Viewers";
 import { PreviewFrame } from "./PreviewFrame";
 
-type Tab = "overview" | "references" | "direction" | "blueprint" | "build" | "redesign" | "versions";
+type Tab = "overview" | "references" | "direction" | "blueprint" | "build" | "files" | "redesign" | "versions";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "references", label: "References" },
   { id: "direction", label: "Design Direction" },
   { id: "blueprint", label: "App Blueprint" },
   { id: "build", label: "Build & Critique" },
+  { id: "files", label: "Files" },
   { id: "redesign", label: "Redesign" },
   { id: "versions", label: "Versions" },
 ];
@@ -220,6 +221,9 @@ export function ProjectWorkspace({ initial }: { initial: SerializedProject }) {
       {/* APP BLUEPRINT */}
       {tab === "blueprint" && <BlueprintTab projectId={p.id} />}
 
+      {/* FILES */}
+      {tab === "files" && <FilesTab projectId={p.id} />}
+
       {/* BUILD & CRITIQUE */}
       {tab === "build" && (
         <BuildTab
@@ -398,6 +402,154 @@ function BuildTab({
             <CritiqueView critique={selected.critique} />
           </div>
         ) : <div className="card p-5 text-sm text-muted">No critique for this version.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Files tab: browse the generated application's source tree ─────────────────────
+type FileEntry = { path: string; size: number };
+
+const fileIcon = (path: string) => {
+  if (/\.tsx?$/.test(path)) return "TS";
+  if (/\.css$/.test(path)) return "CSS";
+  if (/\.prisma$/.test(path)) return "DB";
+  if (/\.json$/.test(path)) return "{}";
+  if (/\.md$/.test(path)) return "MD";
+  return "•";
+};
+
+// Next.js file names repeat (page.tsx / route.ts / layout.tsx), so show the parent
+// folder with them — otherwise the tree is a wall of identical labels.
+const GENERIC = /^(page|route|layout|loading|error|not-found)\.(tsx?|ts)$/;
+const fileLabel = (path: string) => {
+  const parts = path.split("/");
+  const name = parts[parts.length - 1];
+  if (GENERIC.test(name) && parts.length > 1) return `${parts[parts.length - 2]}/${name}`;
+  return name;
+};
+
+function FilesTab({ projectId }: { projectId: string }) {
+  const [files, setFiles] = useState<FileEntry[]>([]);
+  const [appName, setAppName] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [content, setContent] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const d = await api<{ appName: string; files: FileEntry[] }>(`/api/projects/${projectId}/files`);
+        if (!alive) return;
+        setFiles(d.files);
+        setAppName(d.appName);
+        const first = d.files.find((f) => f.path.endsWith("prisma/schema.prisma")) ?? d.files[0];
+        if (first) void open(first.path);
+      } catch (e) {
+        if (alive) setErr(e instanceof Error ? e.message : "Could not load files.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  async function open(path: string) {
+    setSelected(path);
+    setLoadingFile(true);
+    setCopied(false);
+    try {
+      const d = await api<{ content: string }>(`/api/projects/${projectId}/files?path=${encodeURIComponent(path)}`);
+      setContent(d.content);
+    } catch {
+      setContent("// Could not load this file.");
+    } finally {
+      setLoadingFile(false);
+    }
+  }
+
+  if (loading) return <div className="card p-6 text-sm text-muted">Loading project files…</div>;
+  if (err) {
+    return <EmptyState title="No application files yet" desc={err} action={<span className="text-xs text-muted">Generate an App Blueprint first, then come back.</span>} />;
+  }
+
+  // Group by top-level folder for a readable tree.
+  const groups = new Map<string, FileEntry[]>();
+  for (const f of files) {
+    const parts = f.path.split("/");
+    const key = parts.length > 1 ? parts.slice(0, parts.length > 2 ? 2 : 1).join("/") : "(root)";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(f);
+  }
+
+  const lines = content.split("\n");
+
+  return (
+    <div className="animate-in">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">{appName} — generated source</h3>
+          <p className="text-xs text-fg-dim">{files.length} files · a complete Next.js + Prisma app built from the blueprint.</p>
+        </div>
+        <a className="btn-ghost" href={`/api/projects/${projectId}/export?mode=app`}>Download project</a>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+        <div className="card max-h-[70vh] overflow-auto p-3">
+          {[...groups.entries()].map(([folder, entries]) => (
+            <div key={folder} className="mb-3">
+              <div className="mb-1 px-2 font-mono text-[10px] uppercase tracking-wider text-muted">{folder}</div>
+              {entries.map((f) => (
+                <button
+                  key={f.path}
+                  onClick={() => open(f.path)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition",
+                    selected === f.path ? "bg-accent/15 text-fg" : "text-fg-dim hover:bg-surface-2 hover:text-fg"
+                  )}
+                >
+                  <span className="w-6 shrink-0 font-mono text-[9px] text-muted">{fileIcon(f.path)}</span>
+                  <span className="truncate" title={f.path}>{fileLabel(f.path)}</span>
+                  <span className="ml-auto shrink-0 text-[10px] text-muted">{f.size > 1024 ? `${Math.round(f.size / 1024)}k` : f.size}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div className="card overflow-hidden p-0">
+          <div className="flex items-center justify-between border-b px-4 py-2.5">
+            <span className="truncate font-mono text-xs text-fg-dim">{selected ?? "Select a file"}</span>
+            <button
+              className="btn-subtle text-xs"
+              onClick={() => { navigator.clipboard?.writeText(content); setCopied(true); }}
+              disabled={!content}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <div className="max-h-[70vh] overflow-auto bg-surface-2/40">
+            {loadingFile ? (
+              <div className="p-6 text-sm text-muted">Loading…</div>
+            ) : (
+              <pre className="p-0 text-xs leading-relaxed">
+                <code className="block font-mono">
+                  {lines.map((line, i) => (
+                    <span key={i} className="flex">
+                      <span className="w-12 shrink-0 select-none border-r px-2 py-[1px] text-right text-[10px] text-muted">{i + 1}</span>
+                      <span className="whitespace-pre-wrap break-all px-3 py-[1px] text-fg-dim">{line || " "}</span>
+                    </span>
+                  ))}
+                </code>
+              </pre>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -106,7 +106,7 @@ export async function exportProject(projectId: string): Promise<{ filename: stri
  * Application Blueprint (Track B): Prisma schema, real auth, CRUD pages + API routes,
  * design tokens, and the generated marketing site served at "/".
  */
-export async function exportApplication(projectId: string): Promise<{ filename: string; zip: Buffer } | { error: string }> {
+export async function buildProjectApp(projectId: string): Promise<{ slug: string; appName: string; files: { path: string; content: string }[] } | { error: string }> {
   const project = await db.project.findUnique({
     where: { id: projectId },
     include: {
@@ -126,6 +126,11 @@ export async function exportApplication(projectId: string): Promise<{ filename: 
 
   const { appName, slug } = appIdentity(project.name);
   const files = buildApplicationFiles({ appName, slug, blueprint, system, marketingHtml: current?.html ?? null });
+  return { slug, appName, files };
+}
 
-  return { filename: `${slug}-app.zip`, zip: createZip(files.map((f) => ({ name: f.path, data: f.content }))) };
+export async function exportApplication(projectId: string): Promise<{ filename: string; zip: Buffer } | { error: string }> {
+  const built = await buildProjectApp(projectId);
+  if ("error" in built) return built;
+  return { filename: `${built.slug}-app.zip`, zip: createZip(built.files.map((f) => ({ name: f.path, data: f.content }))) };
 }
